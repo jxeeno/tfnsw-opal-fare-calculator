@@ -16,7 +16,7 @@ Fares calculated by this implementation is a best estimate based on available in
 - [ ] Light rail is not currently using distance matrix
 - [ ] Station Access Fees are not available yet
 - [ ] Daily and weekly caps are not available yet
-- [ ] Implement other fares types (other than Adult and Child)
+- [x] Implement other fares types (other than Adult and Child)
 
 ## Outstanding tasks
 - [ ] Maximum journey times and transfer limits are not implemented
