@@ -36,7 +36,7 @@ const convertRailDistanceCsv = async () => {
         }
     }
 
-    fs.writeFileSync("../src/ref_rail_distance.json", JSON.stringify(distancePairs, null, 2));
+    fs.writeFileSync("../src/ref/rail_distance.json", JSON.stringify(distancePairs, null, 2));
 }
 
 convertRailDistanceCsv();
@@ -77,7 +77,7 @@ const convertFerryDistanceCsv = async () => {
         }
     }
 
-    fs.writeFileSync("../src/ref_ferry_distance.json", JSON.stringify(distancePairs, null, 2));
+    fs.writeFileSync("../src/ref/ferry_distance.json", JSON.stringify(distancePairs, null, 2));
 }
 
 convertFerryDistanceCsv();
@@ -91,7 +91,7 @@ const getPublicHolidays = async () => {
         }
     });
 
-    fs.writeFileSync("../src/ref_public_holidays.json", JSON.stringify(data.result.records.map(record => record.Date), null, 2));
+    fs.writeFileSync("../src/ref/public_holidays.json", JSON.stringify(data.result.records.map(record => record.Date), null, 2));
     
 }
 

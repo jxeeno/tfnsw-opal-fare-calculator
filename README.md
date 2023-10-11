@@ -28,11 +28,12 @@ Fares calculated by this implementation is a best estimate based on available in
 * CTP nuances are not implemented, but fares in the context of a journey plan estimate are expected to be the same as Adult Opal
 * Always assumes customer taps on at departure time and taps off at arrival time
 * Assumes customer does not tap off and tap on again for consecutive rail legs where the wait time is less than 1 hour.  OSIs - out of station interchanges - are not possible.
-* Same wharf interchanges at Circular Quay
+* Same wharf interchanges at Circular Quay assumes customer will tap off and on again
 * Specific behaviour for F1 ferry services relating to maximum journey times and transfer times
 * Handling rail stations where there is no TSN or which are served by coach
 * Fares not calculated for NSW TrainLink booked services
 * FOU is not implemented - not relevant in journey plan fare estimate and not available after 19th October
+* Fare calculations assume all trips of the journeys occur within the same Opal day. Fare rules specific to services spanning across multiple Opal days or weeks are not applied.
 
 ## Implemented rules
 
@@ -45,3 +46,4 @@ Fares calculated by this implementation is a best estimate based on available in
 * Longest fare distance rule for non-rail intra-modal transfers
 * Highest fare band rule for intra-modal transfers
 * Inter-modal transfer discount
+* Station access fee

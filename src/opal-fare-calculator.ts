@@ -1,10 +1,10 @@
-import REF_RAIL_DISTANCE from "./ref_rail_distance.json";
-import REF_FERRY_DISTANCE from "./ref_ferry_distance.json";
-import REF_PEAK_HOURS from "./ref_peak_hours.json";
-import REF_PUBLIC_HOLIDAYS from "./ref_public_holidays.json";
-import REF_OUTER_METRO_STATIONS from "./ref_outer_metro_stations.json";
-import REF_SAF_TSN from "./ref_saf_tsn.json";
-import REF_FARE_TABLE from "./ref_fare_table.json";
+import REF_RAIL_DISTANCE from "./ref/rail_distance.json";
+import REF_FERRY_DISTANCE from "./ref/ferry_distance.json";
+import REF_PEAK_HOURS from "./ref/peak_hours.json";
+import REF_PUBLIC_HOLIDAYS from "./ref/public_holidays.json";
+import REF_OUTER_METRO_STATIONS from "./ref/outer_metro_stations.json";
+import REF_SAF_TSN from "./ref/saf_tsn.json";
+import REF_FARE_TABLE from "./ref/fare_table.json";
 
 import { DateTime } from 'luxon';
 import distance from "@turf/distance";
