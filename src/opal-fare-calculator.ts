@@ -21,8 +21,8 @@ export class OpalFareCalculator {
 
 
     static isLegStocktonFerry(leg: EfaRapidJsonLegPartial){
-		return (leg.transportation.product.class === 9 && ['3000'].includes(leg.transportation.operator.id))
-	}
+        return (leg.transportation.product.class === 9 && ['3000'].includes(leg.transportation.operator.id))
+    }
 
     /**
      * Returns the mode of transport used for Opal calculations from an EFA leg
@@ -32,56 +32,56 @@ export class OpalFareCalculator {
      *
      */
     static getOpalModeOfTransportForLeg(leg: EfaRapidJsonLegPartial){
-		// Metro
-		if (leg.transportation.product.class === 2) {
-			return 'RAIL'
-		}
+        // Metro
+        if (leg.transportation.product.class === 2) {
+            return 'RAIL'
+        }
 
-		// Sydney Trains and NSW Trains Intercity (Opal Network)
-		if (
-			leg.transportation.product.class === 1 &&
-			['X0000', 'x0001'].includes(leg.transportation.operator.id)
-		) {
-			return 'RAIL'
-		}
+        // Sydney Trains and NSW Trains Intercity (Opal Network)
+        if (
+            leg.transportation.product.class === 1 &&
+            ['X0000', 'x0001'].includes(leg.transportation.operator.id)
+        ) {
+            return 'RAIL'
+        }
 
-		// Manly Fast Ferry
-		if (
-			leg.transportation.product.class === 9 &&
-			['306'].includes(leg.transportation.operator.id)
-		) {
-			return 'FERRY'
-		}
+        // Manly Fast Ferry
+        if (
+            leg.transportation.product.class === 9 &&
+            ['306'].includes(leg.transportation.operator.id)
+        ) {
+            return 'FERRY'
+        }
 
-		// Sydney Ferries
-		if (
-			leg.transportation.product.class === 9 &&
-			['SF'].includes(leg.transportation.operator.id)
-		) {
-			return 'FERRY'
-		}
+        // Sydney Ferries
+        if (
+            leg.transportation.product.class === 9 &&
+            ['SF'].includes(leg.transportation.operator.id)
+        ) {
+            return 'FERRY'
+        }
 
-		// Light Rail
-		if (
-			leg.transportation.product.class === 4
-		) {
-			return 'LIGHTRAIL'
-		}
+        // Light Rail
+        if (
+            leg.transportation.product.class === 4
+        ) {
+            return 'LIGHTRAIL'
+        }
 
-		// Bus
-		// TODO: handle school buses and replacement buses
-		if (
+        // Bus
+        // TODO: handle school buses and replacement buses
+        if (
             // Regular Opal bus
-			(leg.transportation.product.class === 5 && [5, 15].includes(leg.transportation.iconId)) ||
+            (leg.transportation.product.class === 5 && [5, 15].includes(leg.transportation.iconId)) ||
 
             // Stockton Ferry charged as bus fare
             OpalFareCalculator.isLegStocktonFerry(leg)
-		) {
-			return 'BUS'
-		}
+        ) {
+            return 'BUS'
+        }
 
-		return 'NON_OPAL'
-	}
+        return 'NON_OPAL'
+    }
 
     static getFareDistance(mode: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial){
         const originTsn = OpalFareCalculator.getTsnForStop(origin);
