@@ -71,8 +71,9 @@ const convertFerryDistanceCsv = async () => {
 
             const odKey = `${originTsn}:${destinationTsn}`;
             const doKey = `${destinationTsn}:${originTsn}`;
-            distancePairs[odKey] = Number(row[destinationName].replace(",", ""));
-            distancePairs[doKey] = Number(row[destinationName].replace(",", ""));
+            const val = Number((row[destinationName].replace(",", "")/1000).toFixed(3))
+            distancePairs[odKey] = val;
+            distancePairs[doKey] = val;
         }
     }
 
