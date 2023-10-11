@@ -16,6 +16,7 @@ export class OpalFareCalculator {
     taps: OpalFareTap[] = [];
     legFares: OpalFareComponent[] = [];
     legs: EfaRapidJsonLegPartial[] = [];
+    allLegs: EfaRapidJsonLegPartial[] = [];
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
 
 
@@ -116,6 +117,7 @@ export class OpalFareCalculator {
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
         
         return fareTable[type] as {
+            NAME: string,
             CAPS: {
                 DAILY_CAP: number,
                 WEEKLY_CAP: number
@@ -250,6 +252,8 @@ export class OpalFareCalculator {
     }
 
     addLeg(leg: EfaRapidJsonLegPartial){
+        this.allLegs.push(leg);
+
         const prevLeg = this.legs[this.legs.length-1];
         const taps = OpalFareCalculator.getTapsForLeg(prevLeg, leg);
 
@@ -380,8 +384,8 @@ export class OpalFareCalculator {
                 dailyCapDiscountCents +
                 stationAccessFeeCents
             ),
-            totalFareCents: 0
-            // leg
+            totalFareCents: 0,
+            leg
         };
 
         if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
@@ -408,5 +412,49 @@ export class OpalFareCalculator {
             fares: this.legFares,
             totalFare: this.legFares.reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
         }
+    }
+
+    toEfaFareObject(){
+        const createFareObject = (fare: OpalFareComponent, jsGroup: OpalIntramodalJourneySegmentGroup) => {
+            const dollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
+            const fareName = OpalFareCalculator.getFareParameters(fare.type).NAME;
+            const legIdx = this.allLegs.indexOf(fare.leg);
+            return {
+                "id": `ANYTRIP-EST-${fare.type}-${fare.mode}`, // "REG-BUSES-PEAK",
+                "name": "Opal tariff",
+                "comment": "",
+                "URL": "",
+                "currency": "AUD",
+                "priceLevel": "0",
+                "priceBrutto": Number(dollarString),
+                "priceNetto": 0,
+                "taxPercent": 0,
+                "fromLeg": legIdx,
+                "toLeg": legIdx,
+                "net": "nsw",
+                "person": fare.type,
+                "travellerClass": "SECOND",
+                "timeValidity": "SINGLE",
+                "validMinutes": -1,
+                "isShortHaul": "NO",
+                "returnsAllowed": "NO",
+                "validForOneJourneyOnly": "UNKNOWN",
+                "validForOneOperatorOnly": "UNKNOWN",
+                "numberOfChanges": jsGroup.legs.length,
+                "nameValidityArea": "",
+                "properties": {
+                    "riderCategoryName": fareName,
+                    "priceTotalFare": dollarString,
+                    "distExact": 0,
+                    "distRounded": 0,
+                    "pricePerKM": 0,
+                    "priceBasic": 0,
+                    "tariffProductDefault": [],
+                    "tariffProductOption": []
+                }
+            }
+        }
+
+        return this.intramodalJourneySegmentGroups.flatMap(jsGroup => jsGroup.fares.map(fare => createFareObject(fare, jsGroup)))
     }
 }

@@ -1,5 +1,6 @@
 {
     "ADULT": {
+        "NAME": "Adult",
         "CAPS": {
             "DAILY_CAP": 1680,
             "WEEKLY_CAP": 5000

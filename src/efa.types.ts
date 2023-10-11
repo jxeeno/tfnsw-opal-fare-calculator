@@ -32,7 +32,10 @@ export type EfaRapidJsonLegPartial = {
 
 export type EfaRapidJsonTripPartial = {
 	journeys: Array<{
-		legs: EfaRapidJsonLegPartial[]
+		legs: EfaRapidJsonLegPartial[],
+        fare?: {
+            tickets?: any[]
+        }
 	}>
 }
 
@@ -90,7 +93,7 @@ export type OpalFareComponent = {
     totalAdditionalFareCents: number;
     totalFareCents: number;
 
-    leg?: EfaRapidJsonLegPartial;
+    leg: EfaRapidJsonLegPartial;
 }
 
 export type OpalIntramodalJourneySegmentGroup = {
