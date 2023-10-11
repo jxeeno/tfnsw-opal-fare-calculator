@@ -3,7 +3,7 @@ import REF_FERRY_DISTANCE from "./ref_ferry_distance.json";
 import REF_PEAK_HOURS from "./ref_peak_hours.json";
 import REF_PUBLIC_HOLIDAYS from "./ref_public_holidays.json";
 import REF_OUTER_METRO_STATIONS from "./ref_outer_metro_stations.json";
-import REF_STOCKTON_FERRY_TSN from "./ref_stockton_ferry_tsn.json";
+import REF_SAF_TSN from "./ref_saf_tsn.json";
 import REF_FARE_TABLE from "./ref_fare_table.json";
 
 import { DateTime } from 'luxon';
@@ -112,6 +112,28 @@ export class OpalFareCalculator {
         }
     }
 
+    static getStationAccessFee(type: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial) {
+        const fareTable = (REF_FARE_TABLE as any);
+        if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
+
+        const originTsn = OpalFareCalculator.getTsnForStop(origin);
+        const destinationTsn = OpalFareCalculator.getTsnForStop(destination);
+
+        if(REF_SAF_TSN.includes(originTsn) || destinationTsn.includes(destinationTsn)){
+            // SAF is applicable
+            if(!fareTable[type].SAF) return 0; // TODO: throw error
+
+            const odKey = `${originTsn}:${destinationTsn}`;
+            if(fareTable[type].SAF.ALC_RATES[odKey] != null){
+                return fareTable[type].SAF.ALC_RATES[odKey]
+            }
+
+            return fareTable[type].SAF.NON_ALC_RATE;
+        }
+
+        return 0;
+    }
+
     static getFareTypes(){
         const fareTable = (REF_FARE_TABLE as any);
         return Object.keys(fareTable);
@@ -186,7 +208,7 @@ export class OpalFareCalculator {
         const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: "Australia/Sydney" });
         const ymd = zonedTime.toFormat("yyyyMMdd");
 
-        const isOffPeakDayOfWeek = [5, 6, 7].includes(zonedTime.weekday);
+        const isOffPeakDayOfWeek = [6, 7].includes(zonedTime.weekday);
         const isPublicHoliday = REF_PUBLIC_HOLIDAYS.includes(ymd);
 
         if(isOffPeakDayOfWeek || isPublicHoliday) return false;
@@ -309,6 +331,7 @@ export class OpalFareCalculator {
             let retainHighestFareBand = true;
 
             // TODO: model ferry same wharf interchanges at CQ
+            let stationAccessFeeCents = 0;
             let fareDistance;
             if(currentIntramodalJourneySegmentGroup.mode === 'RAIL'){
                 // We will assume no tap out at interchanges
@@ -322,6 +345,12 @@ export class OpalFareCalculator {
                 fareDistance = OpalFareCalculator.getFareDistance(
                     currentIntramodalJourneySegmentGroup.mode,
                     origin, destination
+                );
+
+                stationAccessFeeCents = OpalFareCalculator.getStationAccessFee(
+                    fareType,
+                    origin,
+                    destination
                 );
 
                 shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps.some(tap => tap.isPeakTapOn);
@@ -369,7 +398,6 @@ export class OpalFareCalculator {
             const offPeakDiscountCents = baseFareCentsCurrentContext - baseFareCents;
 
             const fouDiscountCents = 0; // TODO
-            const stationAccessFeeCents = 0; // TODO
             const complexAdjustmentCents = 0;
             const intramodalDiscountCents = baseFareCents - totalFareForIntermodalJourneySegmentGroup - baseFareCents;
 
@@ -401,12 +429,14 @@ export class OpalFareCalculator {
                 leg
             };
 
+            // do not allow negative fare adjustment (except rail)
             if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
                 const correction = -fare.totalAdditionalFareCents;
                 fare.components.complexAdjustmentCents += correction;
                 fare.totalAdditionalFareCents = 0;
             }
 
+            // use highest band within segment group (except rail)
             const maxPreviousFare = Math.max(...currentIntramodalJourneySegmentGroup.fares[fareType].map(fare => fare.totalFareCents) ?? [0]);
             if((fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup) < maxPreviousFare && retainHighestFareBand){
                 const correction = maxPreviousFare - (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
@@ -432,6 +462,8 @@ export class OpalFareCalculator {
     toEfaFareObject(){
         const createFareObject = (fare: OpalFareComponent, jsGroup: OpalIntramodalJourneySegmentGroup) => {
             const dollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
+            const safDollarString = (fare.components.stationAccessFeeCents/100).toFixed(2);
+            const noSafDollarString = ((fare.totalAdditionalFareCents - fare.components.stationAccessFeeCents)/100).toFixed(2);
             const fareName = OpalFareCalculator.getFareParameters(fare.type).NAME;
             const legIdx = this.allLegs.indexOf(fare.leg);
             return {
@@ -441,7 +473,7 @@ export class OpalFareCalculator {
                 "URL": "",
                 "currency": "AUD",
                 "priceLevel": "0",
-                "priceBrutto": Number(dollarString),
+                "priceBrutto": Number(noSafDollarString),
                 "priceNetto": 0,
                 "taxPercent": 0,
                 "fromLeg": legIdx,
@@ -459,6 +491,7 @@ export class OpalFareCalculator {
                 "nameValidityArea": "",
                 "properties": {
                     "riderCategoryName": fareName,
+                    "priceStationAccessFee": safDollarString,
                     "priceTotalFare": dollarString,
                     "distExact": 0,
                     "distRounded": 0,

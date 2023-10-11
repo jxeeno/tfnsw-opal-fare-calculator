@@ -14,7 +14,7 @@ Fares calculated by this implementation is a best estimate based on available in
 
 - [ ] Opal-enabled temporary bus services which replace rail or ferry services are returning bus fares
 - [ ] Light rail is not currently using distance matrix
-- [ ] Station Access Fees are not available yet
+- [x] Station Access Fees are not available yet
 - [ ] Daily and weekly caps are not available yet
 - [x] Implement other fares types (other than Adult and Child)
 
