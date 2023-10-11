@@ -14,7 +14,7 @@ export class OpalFareCalculator {
     constructor(){}
 
     taps: OpalFareTap[] = [];
-    legFares: OpalFareComponent[] = [];
+    legFares: {[k: string]: OpalFareComponent[]} = {};
     legs: EfaRapidJsonLegPartial[] = [];
     allLegs: EfaRapidJsonLegPartial[] = [];
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
@@ -112,6 +112,11 @@ export class OpalFareCalculator {
         }
     }
 
+    static getFareTypes(){
+        const fareTable = (REF_FARE_TABLE as any);
+        return Object.keys(fareTable);
+    }
+
     static getFareParameters(type: string) {
         const fareTable = (REF_FARE_TABLE as any);
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
@@ -120,6 +125,7 @@ export class OpalFareCalculator {
             NAME: string,
             CAPS: {
                 DAILY_CAP: number,
+                WEEKEND_DAILY_CAP: number,
                 WEEKLY_CAP: number
             },
             INTERMODAL_DISCOUNT: number
@@ -276,7 +282,7 @@ export class OpalFareCalculator {
             currentIntramodalJourneySegmentGroup = {
                 legs: [],
                 taps: [],
-                fares: [],
+                fares: {},
                 mode: taps.on.mode
             };
             this.intramodalJourneySegmentGroups.push(currentIntramodalJourneySegmentGroup);
@@ -286,131 +292,140 @@ export class OpalFareCalculator {
         currentIntramodalJourneySegmentGroup.taps.push(taps.on, taps.off);
 
         // now calculate fares for current intramodal journey segments
-        const fareType = "ADULT";
-        const totalFareForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares.reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0);
-        
-        const intermodalDiscountCents = [
-            OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
-            OpalFareTransactionType.TAP_ON_F1_INTERMODAL_TRANSFER
-        ].includes(currentIntramodalJourneySegmentGroup.taps[0].transactionType) ? -OpalFareCalculator.getFareParameters(fareType).INTERMODAL_DISCOUNT : 0;
+        const fareTypes = OpalFareCalculator.getFareTypes();
+        for(const fareType of fareTypes){
+            if(!this.legFares[fareType]) this.legFares[fareType] = []
+            if(!currentIntramodalJourneySegmentGroup.fares[fareType]) currentIntramodalJourneySegmentGroup.fares[fareType] = []
 
-        let shouldLegUsePeakFare = taps.on.isPeakTapOn;
-        let permitNegativeAdditionalFare = false;
-        let retainHighestFareBand = true;
+            const totalFareForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares[fareType].reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0);
+            
+            const intermodalDiscountCents = [
+                OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
+                OpalFareTransactionType.TAP_ON_F1_INTERMODAL_TRANSFER
+            ].includes(currentIntramodalJourneySegmentGroup.taps[0].transactionType) ? -OpalFareCalculator.getFareParameters(fareType).INTERMODAL_DISCOUNT : 0;
 
-        // TODO: model ferry same wharf interchanges at CQ
-        let fareDistance;
-        if(currentIntramodalJourneySegmentGroup.mode === 'RAIL'){
-            // We will assume no tap out at interchanges
-            // Fare distance is first station in group to last staion in group
+            let shouldLegUsePeakFare = taps.on.isPeakTapOn;
+            let permitNegativeAdditionalFare = false;
+            let retainHighestFareBand = true;
 
-            const origin = currentIntramodalJourneySegmentGroup.legs[0].origin;
-            const destination = currentIntramodalJourneySegmentGroup.legs[
-                currentIntramodalJourneySegmentGroup.legs.length-1
-            ].destination;
+            // TODO: model ferry same wharf interchanges at CQ
+            let fareDistance;
+            if(currentIntramodalJourneySegmentGroup.mode === 'RAIL'){
+                // We will assume no tap out at interchanges
+                // Fare distance is first station in group to last staion in group
 
-            fareDistance = OpalFareCalculator.getFareDistance(
+                const origin = currentIntramodalJourneySegmentGroup.legs[0].origin;
+                const destination = currentIntramodalJourneySegmentGroup.legs[
+                    currentIntramodalJourneySegmentGroup.legs.length-1
+                ].destination;
+
+                fareDistance = OpalFareCalculator.getFareDistance(
+                    currentIntramodalJourneySegmentGroup.mode,
+                    origin, destination
+                );
+
+                shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps.some(tap => tap.isPeakTapOn);
+                permitNegativeAdditionalFare = true;
+                retainHighestFareBand = false;
+            }else{
+                // use the longest distance between any two stops
+                const coords = currentIntramodalJourneySegmentGroup.legs.flatMap(leg => [
+                    OpalFareCalculator.getCoordForStop(leg.origin),
+                    OpalFareCalculator.getCoordForStop(leg.destination)
+                ]);
+
+                for(let i = 0; i < coords.length; i++){
+                    for(let j = 0; j < coords.length; j++){
+                        if(i === j) continue;
+
+                        const origin = coords[i].concat().reverse();
+                        const destination = coords[j].concat().reverse();
+
+                        const pairDistance = distance(origin, destination, {units: 'kilometers'});
+                        if(fareDistance == null || pairDistance > fareDistance){
+                            fareDistance = pairDistance;
+                        }
+                    }    
+                }
+            }
+
+            const baseFareCents = OpalFareCalculator.getBaseFare(
+                fareType,
                 currentIntramodalJourneySegmentGroup.mode,
-                origin, destination
+                fareDistance,
+                true,
+                false
             );
 
-            shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps.some(tap => tap.isPeakTapOn);
-            permitNegativeAdditionalFare = true;
-            retainHighestFareBand = false;
-        }else{
-            // use the longest distance between any two stops
-            const coords = currentIntramodalJourneySegmentGroup.legs.flatMap(leg => [OpalFareCalculator.getCoordForStop(leg.origin), OpalFareCalculator.getCoordForStop(leg.destination)]);
-            for(let i = 0; i < coords.length; i++){
-                for(let j = 0; j < coords.length; j++){
-                    if(i === j) continue;
+            const baseFareCentsCurrentContext = OpalFareCalculator.getBaseFare(
+                fareType,
+                currentIntramodalJourneySegmentGroup.mode,
+                fareDistance,
+                shouldLegUsePeakFare,
+                false
+            );
 
-                    const origin = coords[i].concat().reverse();
-                    const destination = coords[j].concat().reverse();
+            const dailyCapDiscountCents = 0; // TODO
+            const offPeakDiscountCents = baseFareCentsCurrentContext - baseFareCents;
 
-                    const pairDistance = distance(origin, destination, {units: 'kilometers'});
-                    if(fareDistance == null || pairDistance > fareDistance){
-                        fareDistance = pairDistance;
-                    }
-                }    
+            const fouDiscountCents = 0; // TODO
+            const stationAccessFeeCents = 0; // TODO
+            const complexAdjustmentCents = 0;
+            const intramodalDiscountCents = baseFareCents - totalFareForIntermodalJourneySegmentGroup - baseFareCents;
+
+            const fare : OpalFareComponent = {
+                type: fareType,
+                taps,
+                mode: currentIntramodalJourneySegmentGroup.mode,
+                distance: fareDistance,
+                components: {
+                    baseFareCents,
+                    fouDiscountCents,
+                    intramodalDiscountCents,
+                    offPeakDiscountCents,
+                    intermodalDiscountCents,
+                    dailyCapDiscountCents,
+                    stationAccessFeeCents,
+                    complexAdjustmentCents
+                },
+                totalAdditionalFareCents: (
+                    baseFareCents +
+                    fouDiscountCents +
+                    intramodalDiscountCents +
+                    offPeakDiscountCents +
+                    intermodalDiscountCents +
+                    dailyCapDiscountCents +
+                    stationAccessFeeCents
+                ),
+                totalFareCents: 0,
+                leg
+            };
+
+            if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
+                const correction = -fare.totalAdditionalFareCents;
+                fare.components.complexAdjustmentCents += correction;
+                fare.totalAdditionalFareCents = 0;
             }
+
+            const maxPreviousFare = Math.max(...currentIntramodalJourneySegmentGroup.fares[fareType].map(fare => fare.totalFareCents) ?? [0]);
+            if((fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup) < maxPreviousFare && retainHighestFareBand){
+                const correction = maxPreviousFare - (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
+                fare.components.complexAdjustmentCents += correction;
+                fare.totalAdditionalFareCents += correction;
+            }
+
+            fare.totalFareCents = (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
+
+            currentIntramodalJourneySegmentGroup.fares[fareType].push(fare);
+
+            this.legFares[fareType].push(fare);
         }
-
-
-        const baseFareCents = OpalFareCalculator.getBaseFare(
-            fareType,
-            currentIntramodalJourneySegmentGroup.mode,
-            fareDistance,
-            true,
-            false
-        );
-
-        const baseFareCentsCurrentContext = OpalFareCalculator.getBaseFare(
-            fareType,
-            currentIntramodalJourneySegmentGroup.mode,
-            fareDistance,
-            shouldLegUsePeakFare,
-            false
-        );
-
-        const dailyCapDiscountCents = 0; // TODO
-        const offPeakDiscountCents = baseFareCentsCurrentContext - baseFareCents;
-
-        const fouDiscountCents = 0; // TODO
-        const stationAccessFeeCents = 0; // TODO
-        const complexAdjustmentCents = 0;
-        const intramodalDiscountCents = baseFareCents - totalFareForIntermodalJourneySegmentGroup - baseFareCents;
-
-        const fare : OpalFareComponent = {
-            type: fareType,
-            taps,
-            mode: currentIntramodalJourneySegmentGroup.mode,
-            distance: fareDistance,
-            components: {
-                baseFareCents,
-                fouDiscountCents,
-                intramodalDiscountCents,
-                offPeakDiscountCents,
-                intermodalDiscountCents,
-                dailyCapDiscountCents,
-                stationAccessFeeCents,
-                complexAdjustmentCents
-            },
-            totalAdditionalFareCents: (
-                baseFareCents +
-                fouDiscountCents +
-                intramodalDiscountCents +
-                offPeakDiscountCents +
-                intermodalDiscountCents +
-                dailyCapDiscountCents +
-                stationAccessFeeCents
-            ),
-            totalFareCents: 0,
-            leg
-        };
-
-        if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
-            const correction = -fare.totalAdditionalFareCents;
-            fare.components.complexAdjustmentCents += correction;
-            fare.totalAdditionalFareCents = 0;
-        }
-
-        const maxPreviousFare = Math.max(...currentIntramodalJourneySegmentGroup.fares.map(fare => fare.totalFareCents) ?? [0]);
-        if((fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup) < maxPreviousFare && retainHighestFareBand){
-            const correction = maxPreviousFare - (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
-            fare.components.complexAdjustmentCents += correction;
-            fare.totalAdditionalFareCents += correction;
-        }
-
-        fare.totalFareCents = (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
-
-        currentIntramodalJourneySegmentGroup.fares.push(fare);
-        this.legFares.push(fare);
     }
 
     toObject(){
         return {
             fares: this.legFares,
-            totalFare: this.legFares.reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
+            totalFare: (this.legFares['ADULT'] ?? []).reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
         }
     }
 
@@ -455,6 +470,6 @@ export class OpalFareCalculator {
             }
         }
 
-        return this.intramodalJourneySegmentGroups.flatMap(jsGroup => jsGroup.fares.map(fare => createFareObject(fare, jsGroup)))
+        return this.intramodalJourneySegmentGroups.flatMap(jsGroup => Object.entries(jsGroup.fares).flatMap(([fareType, fares]) => fares.map(fare => createFareObject(fare, jsGroup))))
     }
 }

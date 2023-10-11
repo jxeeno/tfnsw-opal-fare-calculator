@@ -99,7 +99,7 @@ export type OpalFareComponent = {
 export type OpalIntramodalJourneySegmentGroup = {
     legs: EfaRapidJsonLegPartial[];
     taps: OpalFareTap[];
-    fares: OpalFareComponent[];
+    fares: {[k: string]: OpalFareComponent[]}
 
     mode: string;
     maximumDistance?: number;
