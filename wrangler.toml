@@ -1,0 +1,3 @@
+name = "tfnsw-efa-opal-fare-calculator"
+main = "src/index.ts"
+compatibility_date = "2023-10-11"

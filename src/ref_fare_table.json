@@ -1,0 +1,123 @@
+{
+    "ADULT": {
+        "CAPS": {
+            "DAILY_CAP": 1680,
+            "WEEKLY_CAP": 5000
+        },
+        "INTERMODAL_DISCOUNT": 100,
+        "MODES": {
+            "RAIL": {
+                "BAND1": {
+                    "PEAK": 379,
+                    "OFFPEAK": 280,
+                    "FOU_PEAK": 189,
+                    "FOU_OFFPEAK": 132,
+                    "FROM_KM": 0,
+                    "TO_KM": 10
+                },
+                "BAND2": {
+                    "PEAK": 471,
+                    "OFFPEAK": 329,
+                    "FOU_PEAK": 235,
+                    "FOU_OFFPEAK": 164,
+                    "FROM_KM": 10,
+                    "TO_KM": 20
+                },
+                "BAND3": {
+                    "PEAK": 542,
+                    "OFFPEAK": 379,
+                    "FOU_PEAK": 271,
+                    "FOU_OFFPEAK": 189,
+                    "FROM_KM": 20,
+                    "TO_KM": 35
+                },
+                "BAND4": {
+                    "PEAK": 724,
+                    "OFFPEAK": 506,
+                    "FOU_PEAK": 362,
+                    "FOU_OFFPEAK": 253,
+                    "FROM_KM": 35,
+                    "TO_KM": 65
+                },
+                "BAND5": {
+                    "PEAK": 931,
+                    "OFFPEAK": 651,
+                    "FOU_PEAK": 465,
+                    "FOU_OFFPEAK": 325,
+                    "FROM_KM": 65,
+                    "TO_KM": 99999999999
+                }
+            },
+            "BUS": {
+                "BAND1": {
+                    "PEAK": 320,
+                    "OFFPEAK": 224,
+                    "FOU_PEAK": 160,
+                    "FOU_OFFPEAK": 112,
+                    "FROM_KM": 0,
+                    "TO_KM": 3
+                },
+                "BAND2": {
+                    "PEAK": 393,
+                    "OFFPEAK": 275,
+                    "FOU_PEAK": 196,
+                    "FOU_OFFPEAK": 137,
+                    "FROM_KM": 3,
+                    "TO_KM": 8
+                },
+                "BAND3": {
+                    "PEAK": 505,
+                    "OFFPEAK": 353,
+                    "FOU_PEAK": 252,
+                    "FOU_OFFPEAK": 176,
+                    "FROM_KM": 8,
+                    "TO_KM": 99999999999
+                }
+            },
+            "LIGHTRAIL": {
+                "BAND1": {
+                    "PEAK": 320,
+                    "OFFPEAK": 224,
+                    "FOU_PEAK": 160,
+                    "FOU_OFFPEAK": 112,
+                    "FROM_KM": 0,
+                    "TO_KM": 3
+                },
+                "BAND2": {
+                    "PEAK": 393,
+                    "OFFPEAK": 275,
+                    "FOU_PEAK": 196,
+                    "FOU_OFFPEAK": 137,
+                    "FROM_KM": 3,
+                    "TO_KM": 8
+                },
+                "BAND3": {
+                    "PEAK": 505,
+                    "OFFPEAK": 353,
+                    "FOU_PEAK": 252,
+                    "FOU_OFFPEAK": 176,
+                    "FROM_KM": 8,
+                    "TO_KM": 99999999999
+                }
+            },
+            "FERRY": {
+                "BAND1": {
+                    "PEAK": 643,
+                    "OFFPEAK": 643,
+                    "FOU_PEAK": 321,
+                    "FOU_OFFPEAK": 321,
+                    "FROM_KM": 0,
+                    "TO_KM": 9
+                },
+                "BAND2": {
+                    "PEAK": 804,
+                    "OFFPEAK": 804,
+                    "FOU_PEAK": 402,
+                    "FOU_OFFPEAK": 402,
+                    "FROM_KM": 9,
+                    "TO_KM": 99999999999
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "tfnsw-efa-opal-fare-calculator",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231002.0",
+    "@types/luxon": "^3.3.2",
+    "typescript": "^5.2.2",
+    "wrangler": "3.11.0"
+  },
+  "private": true,
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@turf/distance": "^6.5.0",
+    "luxon": "^3.4.3"
+  }
+}
