@@ -3,9 +3,11 @@ import REF_FERRY_DISTANCE from "./ref_ferry_distance.json";
 import REF_PEAK_HOURS from "./ref_peak_hours.json";
 import REF_PUBLIC_HOLIDAYS from "./ref_public_holidays.json";
 import REF_OUTER_METRO_STATIONS from "./ref_outer_metro_stations.json";
+import REF_STOCKTON_FERRY_TSN from "./ref_stockton_ferry_tsn.json";
 import REF_FARE_TABLE from "./ref_fare_table.json";
 
 import { DateTime } from 'luxon';
+import distance from "@turf/distance";
 import { EfaRapidJsonLegPartial, EfaRapidJsonStopPartial, OpalFareComponent, OpalFareTap, OpalFareTransactionType, OpalIntramodalJourneySegmentGroup } from "./efa.types";
 
 export class OpalFareCalculator {
@@ -15,6 +17,11 @@ export class OpalFareCalculator {
     legFares: OpalFareComponent[] = [];
     legs: EfaRapidJsonLegPartial[] = [];
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
+
+
+    static isLegStocktonFerry(leg: EfaRapidJsonLegPartial){
+		return (leg.transportation.product.class === 9 && ['3000'].includes(leg.transportation.operator.id))
+	}
 
     /**
      * Returns the mode of transport used for Opal calculations from an EFA leg
@@ -39,7 +46,7 @@ export class OpalFareCalculator {
 
 		// Manly Fast Ferry
 		if (
-			leg.transportation.product.class === 12 &&
+			leg.transportation.product.class === 9 &&
 			['306'].includes(leg.transportation.operator.id)
 		) {
 			return 'FERRY'
@@ -47,7 +54,7 @@ export class OpalFareCalculator {
 
 		// Sydney Ferries
 		if (
-			leg.transportation.product.class === 10 &&
+			leg.transportation.product.class === 9 &&
 			['SF'].includes(leg.transportation.operator.id)
 		) {
 			return 'FERRY'
@@ -57,14 +64,17 @@ export class OpalFareCalculator {
 		if (
 			leg.transportation.product.class === 4
 		) {
-			return 'LIGHT_RAIL'
+			return 'LIGHTRAIL'
 		}
 
 		// Bus
-		// TODO: exclude TCB/private buses, school buses and replacement buses
-        // TODO: handle Stockton ferry
+		// TODO: handle school buses and replacement buses
 		if (
-			leg.transportation.product.class === 5
+            // Regular Opal bus
+			(leg.transportation.product.class === 5 && [5, 15].includes(leg.transportation.iconId)) ||
+
+            // Stockton Ferry charged as bus fare
+            OpalFareCalculator.isLegStocktonFerry(leg)
 		) {
 			return 'BUS'
 		}
@@ -143,8 +153,8 @@ export class OpalFareCalculator {
      *
      */
     static isEligibleForTransferDiscount(prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
-        const prevArrivalTime = new Date(prevLeg.arrivalTimeEstimated ?? prevLeg.arrivalTimePlanned).valueOf();
-        const currDepartureTime = new Date(currLeg.departureTimeEstimated ?? currLeg.departureTimePlanned).valueOf();
+        const prevArrivalTime = new Date(prevLeg.destination.arrivalTimeEstimated ?? prevLeg.destination.arrivalTimePlanned).valueOf();
+        const currDepartureTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned).valueOf();
         return (currDepartureTime - prevArrivalTime) < 60*60*1000;
     }
 
@@ -154,6 +164,14 @@ export class OpalFareCalculator {
         if(stop.parent?.parent?.type === 'stop' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.id;
 
         return "-1"
+    }
+
+    static getCoordForStop(stop: EfaRapidJsonStopPartial) {
+        if(stop.type === 'platform' && stop.isGlobalId) return stop.coord;
+        if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord;
+        if(stop.parent?.parent?.type === 'platform' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.coord;
+
+        return stop.coord
     }
 
     static getIsTapOnPeak(tapOnTime: Date, tsn: string, mode: string) {
@@ -175,7 +193,7 @@ export class OpalFareCalculator {
                 periods = REF_PEAK_HOURS.METRO_PEAK
             }
         }else{
-            // non rail
+            // non rail and non ferry
             periods = REF_PEAK_HOURS.METRO_PEAK
         }
 
@@ -191,7 +209,7 @@ export class OpalFareCalculator {
         const prevLegKey = !prevLeg ? null : OpalFareCalculator.getOpalModeOfTransportForLeg(prevLeg);
         const currLegKey = OpalFareCalculator.getOpalModeOfTransportForLeg(currLeg);
 
-        const isTransfer = (prevLeg && OpalFareCalculator.isEligibleForTransferDiscount(prevLeg, currLeg));
+        const isTransfer = (prevLeg && prevLegKey !== 'NON_OPAL' && OpalFareCalculator.isEligibleForTransferDiscount(prevLeg, currLeg));
         const isIntermodalTransfer = isTransfer && prevLegKey !== currLegKey;
         const isIntramodalTransfer = isTransfer && prevLegKey === currLegKey;
 
@@ -203,14 +221,14 @@ export class OpalFareCalculator {
         }
 
         const originTsn = OpalFareCalculator.getTsnForStop(currLeg.origin);
-        const destinationTsn = OpalFareCalculator.getTsnForStop(currLeg.origin);
+        const destinationTsn = OpalFareCalculator.getTsnForStop(currLeg.destination);
 
-        const tapOnTime = new Date(currLeg.departureTimeEstimated ?? currLeg.departureTimePlanned);
-        const tapOffTime = new Date(currLeg.arrivalTimeEstimated ?? currLeg.arrivalTimePlanned);
+        const tapOnTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned);
+        const tapOffTime = new Date(currLeg.destination.arrivalTimeEstimated ?? currLeg.destination.arrivalTimePlanned);
 
-        const isPeakTapOn = OpalFareCalculator.getIsTapOnPeak(
+        const isPeakTapOn = OpalFareCalculator.isLegStocktonFerry(currLeg) || OpalFareCalculator.getIsTapOnPeak(
             tapOnTime, originTsn, currLegKey
-        )
+        );
 
         return {
             on: {
@@ -234,6 +252,8 @@ export class OpalFareCalculator {
     addLeg(leg: EfaRapidJsonLegPartial){
         const prevLeg = this.legs[this.legs.length-1];
         const taps = OpalFareCalculator.getTapsForLeg(prevLeg, leg);
+
+        if(taps.on.mode === 'NON_OPAL') return;
 
         // append leg to array
         this.legs.push(leg);
@@ -262,14 +282,17 @@ export class OpalFareCalculator {
         currentIntramodalJourneySegmentGroup.taps.push(taps.on, taps.off);
 
         // now calculate fares for current intramodal journey segments
-
         const fareType = "ADULT";
         const totalFareForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares.reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0);
         
         const intermodalDiscountCents = [
             OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
             OpalFareTransactionType.TAP_ON_F1_INTERMODAL_TRANSFER
-        ].includes(taps.on.transactionType) ? -OpalFareCalculator.getFareParameters(fareType).INTERMODAL_DISCOUNT : 0;
+        ].includes(currentIntramodalJourneySegmentGroup.taps[0].transactionType) ? -OpalFareCalculator.getFareParameters(fareType).INTERMODAL_DISCOUNT : 0;
+
+        let shouldLegUsePeakFare = taps.on.isPeakTapOn;
+        let permitNegativeAdditionalFare = false;
+        let retainHighestFareBand = true;
 
         // TODO: model ferry same wharf interchanges at CQ
         let fareDistance;
@@ -286,13 +309,30 @@ export class OpalFareCalculator {
                 currentIntramodalJourneySegmentGroup.mode,
                 origin, destination
             );
+
+            shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps.some(tap => tap.isPeakTapOn);
+            permitNegativeAdditionalFare = true;
+            retainHighestFareBand = false;
         }else{
             // use the longest distance between any two stops
-            
+            const coords = currentIntramodalJourneySegmentGroup.legs.flatMap(leg => [OpalFareCalculator.getCoordForStop(leg.origin), OpalFareCalculator.getCoordForStop(leg.destination)]);
+            for(let i = 0; i < coords.length; i++){
+                for(let j = 0; j < coords.length; j++){
+                    if(i === j) continue;
+
+                    const origin = coords[i].concat().reverse();
+                    const destination = coords[j].concat().reverse();
+
+                    const pairDistance = distance(origin, destination, {units: 'kilometers'});
+                    if(fareDistance == null || pairDistance > fareDistance){
+                        fareDistance = pairDistance;
+                    }
+                }    
+            }
         }
 
 
-        const baseFareCentsAlwaysPeak = OpalFareCalculator.getBaseFare(
+        const baseFareCents = OpalFareCalculator.getBaseFare(
             fareType,
             currentIntramodalJourneySegmentGroup.mode,
             fareDistance,
@@ -300,18 +340,73 @@ export class OpalFareCalculator {
             false
         );
 
-        const baseFareCents = OpalFareCalculator.getBaseFare(
+        const baseFareCentsCurrentContext = OpalFareCalculator.getBaseFare(
             fareType,
             currentIntramodalJourneySegmentGroup.mode,
             fareDistance,
-            taps.on.isPeakTapOn,
+            shouldLegUsePeakFare,
             false
         );
 
-        const dailyCapDiscountCents = 0;
-        const offPeakDiscountCents = baseFareCents-baseFareCentsAlwaysPeak;
+        const dailyCapDiscountCents = 0; // TODO
+        const offPeakDiscountCents = baseFareCentsCurrentContext - baseFareCents;
 
-        const fouDiscountCents = 0;
-        const intramodalDiscountCents = totalFareForIntermodalJourneySegmentGroup
+        const fouDiscountCents = 0; // TODO
+        const stationAccessFeeCents = 0; // TODO
+        const complexAdjustmentCents = 0;
+        const intramodalDiscountCents = baseFareCents - totalFareForIntermodalJourneySegmentGroup - baseFareCents;
+
+        const fare : OpalFareComponent = {
+            type: fareType,
+            taps,
+            mode: currentIntramodalJourneySegmentGroup.mode,
+            distance: fareDistance,
+            components: {
+                baseFareCents,
+                fouDiscountCents,
+                intramodalDiscountCents,
+                offPeakDiscountCents,
+                intermodalDiscountCents,
+                dailyCapDiscountCents,
+                stationAccessFeeCents,
+                complexAdjustmentCents
+            },
+            totalAdditionalFareCents: (
+                baseFareCents +
+                fouDiscountCents +
+                intramodalDiscountCents +
+                offPeakDiscountCents +
+                intermodalDiscountCents +
+                dailyCapDiscountCents +
+                stationAccessFeeCents
+            ),
+            totalFareCents: 0
+            // leg
+        };
+
+        if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
+            const correction = -fare.totalAdditionalFareCents;
+            fare.components.complexAdjustmentCents += correction;
+            fare.totalAdditionalFareCents = 0;
+        }
+
+        const maxPreviousFare = Math.max(...currentIntramodalJourneySegmentGroup.fares.map(fare => fare.totalFareCents) ?? [0]);
+        if((fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup) < maxPreviousFare && retainHighestFareBand){
+            const correction = maxPreviousFare - (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
+            fare.components.complexAdjustmentCents += correction;
+            fare.totalAdditionalFareCents += correction;
+        }
+
+        fare.totalFareCents = (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
+
+        currentIntramodalJourneySegmentGroup.fares.push(fare);
+        this.legFares.push(fare);
+    }
+
+    toObject(){
+        return {
+            fares: this.legFares,
+            totalFare: this.legFares.reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
+        }
     }
 }

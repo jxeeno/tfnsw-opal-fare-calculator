@@ -4,15 +4,15 @@ export type EfaRapidJsonStopPartial = {
 	type: string,
 	coord: [number, number]
 	isGlobalId: boolean;
+    departureTimePlanned: string,
+	departureTimeEstimated?: string,
+	arrivalTimePlanned: string,
+	arrivalTimeEstimated?: string,
 }
 
 export type EfaRapidJsonLegPartial = {
 	origin: EfaRapidJsonStopPartial,
 	destination: EfaRapidJsonStopPartial,
-	departureTimePlanned: string,
-	departureTimeEstimated?: string,
-	arrivalTimePlanned: string,
-	arrivalTimeEstimated?: string,
 	transportation: {
 		id: string,
 		number: string,
@@ -74,7 +74,7 @@ export type OpalFareComponent = {
         off: OpalFareTap
     };
     mode: string;
-    distance: number;
+    distance?: number;
 
     components: {
         baseFareCents: number;
@@ -82,11 +82,13 @@ export type OpalFareComponent = {
         intramodalDiscountCents: number;
         offPeakDiscountCents: number;
         intermodalDiscountCents: number;
+        complexAdjustmentCents: number;
         dailyCapDiscountCents: number;
         stationAccessFeeCents: number;
     };
 
     totalAdditionalFareCents: number;
+    totalFareCents: number;
 
     leg?: EfaRapidJsonLegPartial;
 }

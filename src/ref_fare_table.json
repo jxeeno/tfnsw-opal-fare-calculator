@@ -4,12 +4,12 @@
             "DAILY_CAP": 1680,
             "WEEKLY_CAP": 5000
         },
-        "INTERMODAL_DISCOUNT": 100,
+        "INTERMODAL_DISCOUNT": 200,
         "MODES": {
             "RAIL": {
                 "BAND1": {
                     "PEAK": 379,
-                    "OFFPEAK": 280,
+                    "OFFPEAK": 265,
                     "FOU_PEAK": 189,
                     "FOU_OFFPEAK": 132,
                     "FROM_KM": 0,
