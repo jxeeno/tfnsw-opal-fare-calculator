@@ -63,7 +63,7 @@ export class OpalFareCalculator {
         // Sydney Trains and NSW Trains Intercity (Opal Network)
         if (
             leg.transportation.product.class === 1 &&
-            ['X0000', 'x0001'].includes(leg.transportation.operator.id)
+            ['X000', 'X0000', 'x0001'].includes(leg.transportation.operator.id)
         ) {
             return 'RAIL'
         }
