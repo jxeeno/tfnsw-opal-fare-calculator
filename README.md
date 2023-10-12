@@ -54,7 +54,7 @@ node index.js
 ## Outstanding tasks
 - [ ] Maximum journey times and transfer limits are not implemented
 - [ ] To verify behaviour for school bus services against Trip Planner API
-- [ ] Implement a test suite
+- [x] Implement a test suite
 
 ## Known limitations (also present in existing Trip Planner API)
 
