@@ -348,11 +348,11 @@ export class OpalFareCalculator {
      *
      */
     static getCoordForStop(stop: EfaRapidJsonStopPartial) {
-        if(stop.type === 'platform' && stop.isGlobalId) return stop.coord;
-        if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord;
-        if(stop.parent?.parent?.type === 'platform' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.coord;
+        if(stop.type === 'platform' && stop.isGlobalId) return stop.coord.concat().reverse();
+        if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord.concat().reverse();
+        if(stop.parent?.parent?.type === 'platform' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.coord.concat().reverse();
 
-        return stop.coord
+        return stop.coord.concat().reverse();
     }
 
     /**
@@ -429,7 +429,7 @@ export class OpalFareCalculator {
         const tapOnTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned);
         const tapOffTime = new Date(currLeg.destination.arrivalTimeEstimated ?? currLeg.destination.arrivalTimePlanned);
 
-        const isPeakTapOn = OpalFareCalculator.isLegStocktonFerry(currLeg) || OpalFareCalculator.getIsTapOnPeak(
+        const isPeakTapOn = OpalFareCalculator.getIsTapOnPeak(
             network,
             tapOnTime,
             originTsn,
@@ -443,11 +443,13 @@ export class OpalFareCalculator {
                 mode: currLegKey,
                 time: tapOnTime,
                 isTapOn: true,
+                coords: OpalFareCalculator.getCoordForStop(currLeg.origin),
                 isPeakTapOn
             },
             off: {
                 transactionType: OpalFareTransactionType.TAP_OFF_DISTANCE_BASED,
                 tsn: destinationTsn,
+                coords: OpalFareCalculator.getCoordForStop(currLeg.destination),
                 mode: currLegKey,
                 time: tapOffTime,
                 isTapOn: false
@@ -565,21 +567,21 @@ export class OpalFareCalculator {
                 retainHighestFareBand = false;
             }else{
                 // use the longest distance between any two stops
-                const coords = currentIntramodalJourneySegmentGroup.legs.flatMap(leg => [
-                    OpalFareCalculator.getCoordForStop(leg.origin),
-                    OpalFareCalculator.getCoordForStop(leg.destination)
-                ]);
+                const tapOns = currentIntramodalJourneySegmentGroup.taps.filter(tap => tap.isTapOn);
+                const tapOffs = currentIntramodalJourneySegmentGroup.taps.filter(tap => !tap.isTapOn);
 
-                for(let i = 0; i < coords.length; i++){
-                    for(let j = 0; j < coords.length; j++){
-                        if(i === j) continue;
+                for(let i = 0; i < tapOns.length; i++){
+                    for(let j = 0; j < tapOffs.length; j++){
+                        const tapOn = tapOns[i];
+                        const tapOff = tapOffs[j];
 
-                        const origin = coords[i].concat().reverse();
-                        const destination = coords[j].concat().reverse();
+                        const origin = tapOn.coords;
+                        const destination = tapOff.coords;
 
                         const pairDistance = distance(origin, destination, {units: 'kilometers'});
                         if(fareDistance == null || pairDistance > fareDistance){
                             fareDistance = pairDistance;
+                            shouldLegUsePeakFare = tapOn.isPeakTapOn;
                         }
                     }    
                 }

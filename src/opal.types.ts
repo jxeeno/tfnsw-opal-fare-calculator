@@ -87,6 +87,8 @@ export type OpalFareTap = {
     tsn: string;
     nlc?: string; // unused
 
+    coords: [number, number];
+
     time: Date;
 
     mode: string;
