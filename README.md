@@ -16,7 +16,9 @@ Fares calculated by this implementation is a best estimate based on available in
 
 We are temporarily providing a free, hosted version until the end of the 2023 to assist third-party consumers with the migration.  However, there are no guarentees of uptime, availability or accuracy of this service and the service may be withdrawn at any time.
 
-Your existing API calls to `https://api.transport.nsw.gov.au/v1/tp/trip` can be mapped to `https://tpapi-opal-fare-calc.anytrip.com.au/v1/tp/trip`. You must continue to pass the `Authorization` header with your [TfNSW Open Data](https://opendata.transport.nsw.gov.au/) API Key.  We will not log your API Key (you'll just have take our word for it), or if you are concerned, you may host your own:
+Your existing API calls to `https://api.transport.nsw.gov.au/v1/tp/trip` can be mapped to `https://tpapi-opal-fare-calc.anytrip.com.au/v1/tp/trip`. You must continue to pass the `Authorization` header with your [TfNSW Open Data](https://opendata.transport.nsw.gov.au/) API Key.  We will not log your API Key (you'll just have take our word for it), or if you are concerned, you may host your own.
+
+Your API request must include `outputFormat=rapidJSON` and `coordOutputFormat=EPSG:4326` for the calculator to work.  This is because other output formats (e.g. XML) is not supported by this middleware and there is currently no projection data in the middleware to allow for converting stop coordinate data to WGS84.
 
 ## Deploy to Cloudflare Workers
 
