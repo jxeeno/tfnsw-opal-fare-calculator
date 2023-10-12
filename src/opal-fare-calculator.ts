@@ -701,7 +701,7 @@ export class OpalFareCalculator {
     toEfaFareObject(){
         const createFareObject = (fare: OpalFareComponent, jsGroup: OpalIntramodalJourneySegmentGroup) => {
             const dollarString = ((fare.totalAdditionalFareCents/100) + fare.totalAdditionalSafCents/100).toFixed(2);
-            const safDollarString = (fare.totalAdditionalSafCents/100).toFixed(2);
+            const safDollarString = fare.totalAdditionalSafCents > 0 ? (fare.totalAdditionalSafCents/100).toFixed(2) : undefined;
             const noSafDollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
             const fareName = OpalFareCalculator.getFareParameters(jsGroup.network, fare.type).NAME;
             const legIdx = this.allLegs.indexOf(fare.leg);
@@ -756,7 +756,11 @@ export class OpalFareCalculator {
             (cloned.properties as any).evaluationTicket = "nswFareEnabled";
             cloned.priceBrutto = Number(fares.reduce((pv, fare) => pv + Number(fare.priceBrutto), 0).toFixed(2));
             cloned.properties.priceTotalFare = fares.reduce((pv, fare) => pv + Number(fare.properties.priceTotalFare), 0).toFixed(2);
-            cloned.properties.priceStationAccessFee = fares.reduce((pv, fare) => pv + Number(fare.properties.priceStationAccessFee), 0).toFixed(2);
+            cloned.properties.priceStationAccessFee = fares.reduce((pv, fare) => pv + Number(fare.properties.priceStationAccessFee ?? 0), 0).toFixed(2);
+
+            if(cloned.properties.priceStationAccessFee === '0.00'){
+                cloned.properties.priceStationAccessFee = undefined;
+            }
             return cloned;
         });
 
