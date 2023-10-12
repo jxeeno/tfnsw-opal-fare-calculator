@@ -5,3 +5,5 @@ usage_model = "bundled"
 routes = [
 	{ pattern = "tpapi-opal-fare-calc.anytrip.com.au", custom_domain = true }
 ]
+[placement]
+mode = "smart"
