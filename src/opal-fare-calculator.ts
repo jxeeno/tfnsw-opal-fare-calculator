@@ -437,7 +437,6 @@ export class OpalFareCalculator {
                 }
             }
 
-            // TODO: throw an error
             if(fareDistance == null) throw new Error(`Could not calculate fare distance`);
 
             const baseFareCents = OpalFareCalculator.getBaseFare(
@@ -461,7 +460,7 @@ export class OpalFareCalculator {
             const dailyCapDiscountCents = 0; // TODO
             const offPeakDiscountCents = baseFareCentsCurrentContext - baseFareCents;
 
-            const fouDiscountCents = 0; // TODO
+            const fouDiscountCents = 0;
             const complexAdjustmentCents = 0;
             const intramodalDiscountCents = baseFareCents - totalFareForIntermodalJourneySegmentGroup - baseFareCents;
 
@@ -493,9 +492,6 @@ export class OpalFareCalculator {
                 totalSafCents: 0,
                 leg
             };
-
-            // FIXME: station access fee needs to be calculated independently
-            // there may be edge cases where below will adjust SAF
 
             // do not allow negative fare adjustment (except rail)
             if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
