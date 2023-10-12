@@ -5,8 +5,9 @@ import REF_PUBLIC_HOLIDAYS from "./ref/public_holidays.json";
 import REF_OUTER_METRO_STATIONS from "./ref/outer_metro_stations.json";
 import REF_SAF_TSN from "./ref/saf_tsn.json";
 import REF_FARE_TABLE from "./ref/fare_table.json";
+import REF_CONFIG from "./ref/config.json";
 
-import { DateTime } from 'luxon';
+import { DateTime, Duration } from 'luxon';
 import distance from "@turf/distance";
 import { EfaRapidJsonLegPartial, EfaRapidJsonStopPartial, OpalFareComponent, OpalFareTap, OpalFareTransactionType, OpalIntramodalJourneySegmentGroup } from "./efa.types";
 
@@ -119,7 +120,7 @@ export class OpalFareCalculator {
         const originTsn = OpalFareCalculator.getTsnForStop(origin);
         const destinationTsn = OpalFareCalculator.getTsnForStop(destination);
 
-        if(REF_SAF_TSN.includes(originTsn) || destinationTsn.includes(destinationTsn)){
+        if(REF_SAF_TSN.includes(originTsn) || REF_SAF_TSN.includes(destinationTsn)){
             // SAF is applicable
             if(!fareTable[type].SAF) return 0; // TODO: throw error
 
@@ -154,6 +155,24 @@ export class OpalFareCalculator {
         };
     }
 
+    static getOpalDate(date: Date) {
+        const zonedTime = DateTime.fromJSDate(date, { zone: REF_CONFIG.TZ });
+        const opalTime = zonedTime.minus(Duration.fromObject({hours: 4})); // opal day starts at 4am
+
+        return {date: opalTime.toFormat('yyyyMMdd'), dow: opalTime.weekday}
+    }
+
+    static getDailyCap(type: string, tapOn: OpalFareTap) {
+        const params = this.getFareParameters(type);
+        const opalFareDate = OpalFareCalculator.getOpalDate(tapOn.time);
+
+        if(REF_CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow)){
+            return {amount: params.CAPS.WEEKEND_DAILY_CAP, ymd: opalFareDate.date}
+        }
+
+        return {amount: params.CAPS.DAILY_CAP, ymd: opalFareDate.date}
+    }
+
     /**
      * Returns whether two consecutive legs are likely to involve a tap off / tap on event
      *
@@ -185,7 +204,18 @@ export class OpalFareCalculator {
     static isEligibleForTransferDiscount(prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
         const prevArrivalTime = new Date(prevLeg.destination.arrivalTimeEstimated ?? prevLeg.destination.arrivalTimePlanned).valueOf();
         const currDepartureTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned).valueOf();
-        return (currDepartureTime - prevArrivalTime) < 60*60*1000;
+
+        const prevArrivalOpalYmd = OpalFareCalculator.getOpalDate(new Date(prevArrivalTime)).date; // opal day starts at 4am
+        const currArrivalOpalYmd = OpalFareCalculator.getOpalDate(new Date(currDepartureTime)).date; // opal day starts at 4am
+
+        return (
+            // transfer period is max 1 hour
+            // TODO: implement CQ-Manly exception
+            (currDepartureTime - prevArrivalTime) < 60*60*1000
+        ) && (
+            // first tap on new Opal day is always start of new journey
+            prevArrivalOpalYmd === currArrivalOpalYmd
+        );
     }
 
     static getTsnForStop(stop: EfaRapidJsonStopPartial) {
@@ -205,11 +235,11 @@ export class OpalFareCalculator {
     }
 
     static getIsTapOnPeak(tapOnTime: Date, tsn: string, mode: string) {
-        const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: "Australia/Sydney" });
-        const ymd = zonedTime.toFormat("yyyyMMdd");
+        const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: REF_CONFIG.TZ });
+        const opalFareDate = OpalFareCalculator.getOpalDate(tapOnTime);
 
-        const isOffPeakDayOfWeek = [6, 7].includes(zonedTime.weekday);
-        const isPublicHoliday = REF_PUBLIC_HOLIDAYS.includes(ymd);
+        const isOffPeakDayOfWeek = REF_CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow);
+        const isPublicHoliday = REF_PUBLIC_HOLIDAYS.includes(opalFareDate.date);
 
         if(isOffPeakDayOfWeek || isPublicHoliday) return false;
 
@@ -305,7 +335,8 @@ export class OpalFareCalculator {
                 legs: [],
                 taps: [],
                 fares: {},
-                mode: taps.on.mode
+                mode: taps.on.mode,
+                ...OpalFareCalculator.getOpalDate(taps.on.time)
             };
             this.intramodalJourneySegmentGroups.push(currentIntramodalJourneySegmentGroup);
         }
@@ -320,6 +351,7 @@ export class OpalFareCalculator {
             if(!currentIntramodalJourneySegmentGroup.fares[fareType]) currentIntramodalJourneySegmentGroup.fares[fareType] = []
 
             const totalFareForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares[fareType].reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0);
+            const totalSafForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares[fareType].reduce((pv, fare) => pv + fare.totalAdditionalSafCents, 0);
             
             const intermodalDiscountCents = [
                 OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
@@ -422,12 +454,16 @@ export class OpalFareCalculator {
                     intramodalDiscountCents +
                     offPeakDiscountCents +
                     intermodalDiscountCents +
-                    dailyCapDiscountCents +
-                    stationAccessFeeCents
+                    dailyCapDiscountCents
                 ),
                 totalFareCents: 0,
+                totalAdditionalSafCents: stationAccessFeeCents - totalSafForIntermodalJourneySegmentGroup,
+                totalSafCents: 0,
                 leg
             };
+
+            // FIXME: station access fee needs to be calculated independently
+            // there may be edge cases where below will adjust SAF
 
             // do not allow negative fare adjustment (except rail)
             if(fare.totalAdditionalFareCents < 0 && !permitNegativeAdditionalFare){
@@ -444,7 +480,20 @@ export class OpalFareCalculator {
                 fare.totalAdditionalFareCents += correction;
             }
 
+            // apply daily fare cap
+            const dailyCap = OpalFareCalculator.getDailyCap(fareType, taps.on);
+            const totalFareTodayPriorToCurrentLeg = this.intramodalJourneySegmentGroups.filter(group => {
+                return group.date === currentIntramodalJourneySegmentGroup.date
+            }).reduce((prevValue, group) => prevValue + group.fares[fareType].reduce((prevValue, fare) => prevValue + fare.totalAdditionalFareCents, 0), 0);
+            const totalFareToday = totalFareTodayPriorToCurrentLeg + fare.totalAdditionalFareCents;
+            if(totalFareToday > dailyCap.amount){
+                const correction = -(totalFareToday-dailyCap.amount);
+                fare.components.dailyCapDiscountCents += correction;
+                fare.totalAdditionalFareCents += correction;
+            }
+
             fare.totalFareCents = (fare.totalAdditionalFareCents + totalFareForIntermodalJourneySegmentGroup);
+            fare.totalSafCents = (fare.totalAdditionalSafCents + totalSafForIntermodalJourneySegmentGroup);
 
             currentIntramodalJourneySegmentGroup.fares[fareType].push(fare);
 
@@ -455,15 +504,15 @@ export class OpalFareCalculator {
     toObject(){
         return {
             fares: this.legFares,
-            totalFare: (this.legFares['ADULT'] ?? []).reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
+            // totalFare: (this.legFares['ADULT'] ?? []).reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0)
         }
     }
 
     toEfaFareObject(){
         const createFareObject = (fare: OpalFareComponent, jsGroup: OpalIntramodalJourneySegmentGroup) => {
-            const dollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
-            const safDollarString = (fare.components.stationAccessFeeCents/100).toFixed(2);
-            const noSafDollarString = ((fare.totalAdditionalFareCents - fare.components.stationAccessFeeCents)/100).toFixed(2);
+            const dollarString = ((fare.totalAdditionalFareCents/100) + fare.totalAdditionalSafCents/100).toFixed(2);
+            const safDollarString = (fare.totalAdditionalSafCents/100).toFixed(2);
+            const noSafDollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
             const fareName = OpalFareCalculator.getFareParameters(fare.type).NAME;
             const legIdx = this.allLegs.indexOf(fare.leg);
             return {

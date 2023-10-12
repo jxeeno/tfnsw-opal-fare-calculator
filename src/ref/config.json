@@ -1,0 +1,6 @@
+{
+    "VALID_FROM": "20221125",
+    "VALID_TO": "20231019",
+    "TZ": "Australia/Sydney",
+    "WEEKEND_FARE_DOW": [6,7]
+}

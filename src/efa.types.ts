@@ -93,6 +93,9 @@ export type OpalFareComponent = {
     totalAdditionalFareCents: number;
     totalFareCents: number;
 
+    totalAdditionalSafCents: number;
+    totalSafCents: number;
+
     leg: EfaRapidJsonLegPartial;
 }
 
@@ -102,6 +105,8 @@ export type OpalIntramodalJourneySegmentGroup = {
     fares: {[k: string]: OpalFareComponent[]}
 
     mode: string;
+    date: string;
+    dow: number;
     maximumDistance?: number;
     hasPeakTapOn?: boolean;
 }
