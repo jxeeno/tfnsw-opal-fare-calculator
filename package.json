@@ -5,12 +5,15 @@
     "@cloudflare/workers-types": "^4.20231002.0",
     "@types/luxon": "^3.3.2",
     "typescript": "^5.2.2",
+    "vitest": "^0.34.6",
+    "vitest-fetch-mock": "^0.2.2",
     "wrangler": "3.11.0"
   },
   "private": true,
   "scripts": {
     "start": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "vitest run"
   },
   "dependencies": {
     "@turf/distance": "^6.5.0",
