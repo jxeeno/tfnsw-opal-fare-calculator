@@ -4,6 +4,10 @@ Transport for NSW indicated that fare calculations will [not be provided](https:
 
 It is intended to be a drop-in replacement to ensure existing applications continue to work and is to be used in conjunction with the TfNSW [Trip Planner API](https://opendata.transport.nsw.gov.au/dataset/trip-planner-apis).
 
+## Disclaimer
+
+Fares calculated by this implementation is a best estimate based on available information.  We cannot guarantee it is correct and free of errors.  You are welcome to report issues and submit pull requests to resolve any bugs you may find.
+
 # Usage
 
 ## Use the hosted version
@@ -23,9 +27,15 @@ You will need to update `wrangler.toml` to use your own domain name (or remove r
 
 Learn more about using the Cloudflare [Wrangler CLI](https://developers.cloudflare.com/workers/get-started/guide/) here
 
-## Disclaimer
+# Generate reference data
 
-Fares calculated by this implementation is a best estimate based on available information.  We cannot guarantee it is correct and free of errors.  You are welcome to report issues and submit pull requests to resolve any bugs you may find.
+Reference data needs to be retrieved or transformed into the network file to calculate fares.  This includes data like distance matrices, public holiday data and fare tables. You can run generate the network data by running these commands:
+
+```bash
+cd reference-data-generator
+npm i
+node index.js
+```
 
 # Implmentation
 
