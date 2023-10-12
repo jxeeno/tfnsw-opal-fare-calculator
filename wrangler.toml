@@ -1,3 +1,7 @@
 name = "tfnsw-efa-opal-fare-calculator"
 main = "src/index.ts"
 compatibility_date = "2023-10-11"
+usage_model = "bundled"
+routes = [
+	{ pattern = "tpapi-opal-fare-calc.anytrip.com.au", custom_domain = true }
+]
