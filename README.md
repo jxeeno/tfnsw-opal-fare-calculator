@@ -72,13 +72,13 @@ node index.js
 ## Implemented rules
 
 * Rail and ferry distances from mapping table
-* Peak, off-peak fares including variying peak times for intercity stations
+* Peak, off-peak fares including varying peak times for intercity stations
 * Public holidays and Friday/Saturday/Sunday fares
 * Stockton Ferry fares are peak bus fares
-* Intra-modal transfer discount aka "Opal Trip Advantage"
+* Intra-modal transfer discount aka "Opal Trip Advantage" (same mode)
+* Inter-modal transfer discount (different modes)
 * Partial peak services during an intra-modal transfer
 * Longest fare distance rule for non-rail intra-modal transfers
 * Highest fare band rule for intra-modal transfers
-* Inter-modal transfer discount
 * Station access fee
 * Daily caps
