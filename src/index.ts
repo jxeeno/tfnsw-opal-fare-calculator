@@ -39,12 +39,23 @@ export default {
 				const tickets = calculator.toEfaFareObject();
 				const fareTypes = Object.keys(calculator.toObject().fares);
 
-				const fareDebug = Object.fromEntries(fareTypes.map(fareType => [
-					fareType, {
-						efaTotalFare: journey.fare?.tickets?.filter((ticket: any) => ticket.person === fareType && ticket.properties.evaluationTicket).reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
-						anytripTotalFare: tickets.filter((ticket: any) => ticket.person === fareType).reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2)
+				const fareDebug = Object.fromEntries(fareTypes.map(fareType => {
+					const efaFares = journey.fare?.tickets?.filter((ticket: any) => ticket.person === fareType && !ticket.properties.evaluationTicket);
+					const anytripFares = tickets.filter((ticket: any) => ticket.person === fareType);
+					const result = {
+						result: "OK",
+						efaTotalFare: efaFares?.reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
+						anytripTotalFare: anytripFares.reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
+						efaByLeg: efaFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare})),
+						anytripByLeg: anytripFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare}))
 					}
-				]))
+					
+					if(result.efaTotalFare !== result.anytripTotalFare){
+						result.result = "FAIL"
+					}
+
+					return [fareType, result]
+				}))
 
 				debugJourneys.push(fareDebug)
 	
