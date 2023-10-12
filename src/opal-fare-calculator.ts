@@ -570,12 +570,13 @@ export class OpalFareCalculator {
                 "validForOneOperatorOnly": "UNKNOWN",
                 "numberOfChanges": jsGroup.legs.length,
                 "nameValidityArea": "",
-                "validFrom": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_FROM, 'yyyyMMdd').plus(Duration.fromObject({hours: 4})).toISO(),
-                "validTo": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_TO, 'yyyyMMdd').endOf('day').plus(Duration.fromObject({hours: 4})).toISO(),
+                "validFrom": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_FROM, 'yyyyMMdd').plus(Duration.fromObject({hours: 4})).toUTC().toISO(),
+                "validTo": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_TO, 'yyyyMMdd').endOf('day').plus(Duration.fromObject({hours: 4})).toUTC().toISO(),
                 "properties": {
                     "riderCategoryName": fareName,
                     "priceStationAccessFee": safDollarString,
                     "priceTotalFare": dollarString,
+                    "evaluationTicket": undefined,
                     "distExact": 0,
                     "distRounded": 0,
                     "pricePerKM": 0,
@@ -586,6 +587,19 @@ export class OpalFareCalculator {
             }
         }
 
-        return this.intramodalJourneySegmentGroups.flatMap(jsGroup => Object.entries(jsGroup.fares).flatMap(([fareType, fares]) => fares.map(fare => createFareObject(fare, jsGroup))))
+        const faresByLeg = this.intramodalJourneySegmentGroups.flatMap(jsGroup => Object.entries(jsGroup.fares).flatMap(([fareType, fares]) => fares.map(fare => createFareObject(fare, jsGroup))));
+
+        const fareTypes = [...new Set(faresByLeg.map(fare => fare.person))];
+        const evaluationTicketByTicket = fareTypes.map(fareType => {
+            const fares = faresByLeg.filter(fare => fare.person === fareType);
+            const cloned = structuredClone(fares[0]);
+            (cloned.properties as any).evaluationTicket = "nswFareEnabled";
+            cloned.priceBrutto = Number(fares.reduce((pv, fare) => pv + Number(fare.priceBrutto), 0).toFixed(2));
+            cloned.properties.priceTotalFare = fares.reduce((pv, fare) => pv + Number(fare.properties.priceTotalFare), 0).toFixed(2);
+            cloned.properties.priceStationAccessFee = fares.reduce((pv, fare) => pv + Number(fare.properties.priceStationAccessFee), 0).toFixed(2);
+            return cloned;
+        });
+
+        return faresByLeg.concat(evaluationTicketByTicket);
     }
 }

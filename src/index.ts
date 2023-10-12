@@ -10,6 +10,7 @@ export default {
 		const url = new URL(request.url);
 
 		const anytripFareDebug = url.searchParams.has('anytripFareDebug');
+		const showEfaFares = url.searchParams.has('showEfaFares');
 
 		const auth = request.headers.get('authorization')
 
@@ -40,8 +41,8 @@ export default {
 				const fareTypes = Object.keys(calculator.toObject().fares);
 
 				const fareDebug = Object.fromEntries(fareTypes.map(fareType => {
-					const efaFares = journey.fare?.tickets?.filter((ticket: any) => ticket.person === fareType && !ticket.properties.evaluationTicket);
-					const anytripFares = tickets.filter((ticket: any) => ticket.person === fareType);
+					const efaFares = journey.fare?.tickets?.filter((ticket) => ticket.person === fareType && !ticket.properties.evaluationTicket);
+					const anytripFares = tickets.filter((ticket) => ticket.person === fareType && !ticket.properties.evaluationTicket);
 					const result = {
 						result: "OK",
 						efaTotalFare: efaFares?.reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
@@ -49,7 +50,7 @@ export default {
 						efaByLeg: efaFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare})),
 						anytripByLeg: anytripFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare}))
 					}
-					
+
 					if(result.efaTotalFare !== result.anytripTotalFare){
 						result.result = "FAIL"
 					}
@@ -59,11 +60,13 @@ export default {
 
 				debugJourneys.push(fareDebug)
 	
-				Object.assign(journey, {
-					fares: {
-						tickets
-					}
-				});
+				if(!showEfaFares){
+					Object.assign(journey, {
+						fare: {
+							tickets
+						}
+					});
+				}
 			}
 
 			if(anytripFareDebug){
