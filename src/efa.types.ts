@@ -11,6 +11,7 @@ export type EfaRapidJsonStopPartial = {
 }
 
 export type EfaRapidJsonLegPartial = {
+    duration: number,
     origin: EfaRapidJsonStopPartial,
     destination: EfaRapidJsonStopPartial,
     transportation: {

@@ -295,10 +295,11 @@ export class OpalFareCalculator {
      * @param network - The Opal Network config to use
      * @param prevLeg - The previous leg
      * @param currLeg - The current leg
+     * @param transferWalkTime - The time it takes to walk from destination of prev leg to current leg.  This field should only be set if the destination or origin is a station
      * @returns true if eligible for discount
      *
      */
-    static isEligibleForTransferDiscount(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
+    static isEligibleForTransferDiscount(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial, transferWalkTime: number|null){
         const prevArrivalTime = new Date(prevLeg.destination.arrivalTimeEstimated ?? prevLeg.destination.arrivalTimePlanned).valueOf();
         const currDepartureTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned).valueOf();
 
@@ -308,7 +309,10 @@ export class OpalFareCalculator {
         return (
             // transfer period is max 1 hour
             // TODO: implement CQ-Manly exception
-            (currDepartureTime - prevArrivalTime) < 60*60*1000
+            (currDepartureTime - prevArrivalTime) < 60*60*1000 ||
+
+            // use transfer walk time available
+            (transferWalkTime != null && transferWalkTime < 60*60)
         ) && (
             // first tap on new Opal day is always start of new journey
             prevArrivalOpalYmd === currArrivalOpalYmd
@@ -408,11 +412,23 @@ export class OpalFareCalculator {
      * @returns an object with tap on and tap off
      *
      */
-    static getTapsForLeg(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial|null|undefined, currLeg: EfaRapidJsonLegPartial) {
+    static getTapsForLeg(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial|null|undefined, currLeg: EfaRapidJsonLegPartial, transferWalkTime: number|null) {
         const prevLegKey = !prevLeg ? null : OpalFareCalculator.getOpalModeOfTransportForLeg(prevLeg);
         const currLegKey = OpalFareCalculator.getOpalModeOfTransportForLeg(currLeg);
 
-        const isTransfer = (prevLeg && prevLegKey !== 'NON_OPAL' && OpalFareCalculator.isEligibleForTransferDiscount(network, prevLeg, currLeg));
+        // customer can wait at a station or wharf before transferring to the next leg
+        // this means we can use the walk time between means of transport as the transfer period
+        const canUseTransferWalkTime = (['RAIL', 'FERRY'].includes(prevLegKey ?? '') || ['RAIL', 'FERRY'].includes(currLegKey));
+
+        const isTransfer = (
+            prevLeg &&
+            OpalFareCalculator.isEligibleForTransferDiscount(
+                network,
+                prevLeg,
+                currLeg,
+                canUseTransferWalkTime ? transferWalkTime : null
+            )
+        );
         const isIntermodalTransfer = isTransfer && prevLegKey !== currLegKey;
         const isIntramodalTransfer = isTransfer && prevLegKey === currLegKey;
 
@@ -479,7 +495,7 @@ export class OpalFareCalculator {
         this.allLegs.push(leg);
 
         const prevLeg = this.legs[this.legs.length-1];
-        const taps = OpalFareCalculator.getTapsForLeg(network, prevLeg, leg);
+        const taps = OpalFareCalculator.getTapsForLeg(network, prevLeg, leg, null);
 
         if(taps.on.mode === 'NON_OPAL') return;
 
