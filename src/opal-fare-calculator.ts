@@ -675,7 +675,7 @@ export class OpalFareCalculator {
     }
 
     /**
-     * Exports an array of EFA-compatable ticket objects
+     * Exports an array of EFA-compatible ticket objects
      *
      * @returns array of EFA ticket objects
      *
