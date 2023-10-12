@@ -95,7 +95,7 @@ export class OpalFareCalculator {
         // TODO: handle school buses and replacement buses
         if (
             // Regular Opal bus
-            (leg.transportation.product.class === 5 && [5, 15].includes(leg.transportation.iconId)) ||
+            (leg.transportation.product.class === 5 && [5, 15].includes(leg.transportation.product.iconId)) ||
 
             // Stockton Ferry charged as bus fare
             OpalFareCalculator.isLegStocktonFerry(leg)
