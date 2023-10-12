@@ -13,6 +13,13 @@ export class OpalFareCalculator {
     allLegs: EfaRapidJsonLegPartial[] = [];
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
 
+    /**
+     * Returns the valid Opal Network configuration object for a given tap on time
+     *
+     * @param time - a Javascript Date object representing the tap on time
+     * @returns an OpalNetwork object
+     *
+     */
     static getNetworkForTime(time?: Date){
         const networks = REF_NETWORKS as OpalNetwork[];
         for(const network of networks){
@@ -26,6 +33,13 @@ export class OpalFareCalculator {
         return networks[networks.length-1]
     }
 
+    /**
+     * Returns whether a leg from the EFA trip planner response is the Stockton ferry
+     *
+     * @param leg - an EFA trip planner leg
+     * @returns true if it's the Stockton ferry, false for all other legs
+     *
+     */
     static isLegStocktonFerry(leg: EfaRapidJsonLegPartial){
         return (leg.transportation.product.class === 9 && ['3000'].includes(leg.transportation.operator.id))
     }
@@ -89,6 +103,16 @@ export class OpalFareCalculator {
         return 'NON_OPAL'
     }
 
+    /**
+     * Returns the estimated fare distance from a distance matrix
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @param mode - identifier for the mode used for Opal fare calculations (e.g. RAIL)
+     * @param origin - an EFA stop object representing the origin location
+     * @param destination - an EFA stop object representing the origin destination
+     * @returns distance used for fare calculations in kilometers
+     *
+     */
     static getFareDistance(network: OpalNetwork, mode: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial){
         const originTsn = OpalFareCalculator.getTsnForStop(origin);
         const destinationTsn = OpalFareCalculator.getTsnForStop(destination);
@@ -100,6 +124,19 @@ export class OpalFareCalculator {
         }
     }
 
+    /**
+     * Returns the base fare to be charged, usually without discounts
+     * However, peak and FOU discount can be specified.
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @param type - fare type (e.g. ADULT)
+     * @param mode - identifier for the mode used for Opal fare calculations (e.g. RAIL)
+     * @param distance - number of kilometers to calculate the fare for
+     * @param isPeak - boolean for whether the fare should be a peak fare
+     * @param isFou - boolean for whether the fare has hit the frequency of use threshold
+     * @returns base fare to be charged in cents
+     *
+     */
     static getBaseFare(network: OpalNetwork, type: string, mode: string, distance: number, isPeak: boolean, isFou: boolean) {
         const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
@@ -123,6 +160,17 @@ export class OpalFareCalculator {
         return lastBand;
     }
 
+    /**
+     * Returns the station access fee to be charged if applicable
+     * `0` is returned if no station access fee is charged
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @param type - fare type (e.g. ADULT)
+     * @param origin - an EFA stop object representing the origin location
+     * @param destination - an EFA stop object representing the origin destination
+     * @returns station access fee to be charged in cents
+     *
+     */
     static getStationAccessFee(network: OpalNetwork, type: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial) {
         const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
@@ -145,58 +193,81 @@ export class OpalFareCalculator {
         return 0;
     }
 
+    /**
+     * Returns an array of fare types in the current OpalNetwork config
+     * e.g. `["ADULT", "CHILD", ...]`
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @returns array of strings for fare types
+     *
+     */
     static getFareTypes(network: OpalNetwork){
         const fareTable = network.FARE_TABLE;
         return Object.keys(fareTable);
     }
 
+    /**
+     * Returns the applicable fare parameters for a given fare type
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @param type - fare type (e.g. ADULT)
+     * @returns applicable fare table in the current OpalNetwork for the selected fare type
+     *
+     */
     static getFareParameters(network: OpalNetwork, type: string) {
         const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
         
-        return fareTable[type] as {
-            NAME: string,
-            CAPS: {
-                DAILY_CAP: number,
-                WEEKEND_DAILY_CAP: number,
-                WEEKLY_CAP: number
-            },
-            INTERMODAL_DISCOUNT: number
-        };
+        return fareTable[type];
     }
 
+    /**
+     * Returns the date, day of week and if it is a weekend for Opal purposes
+     * as used by Opal for fare calculation
+     * 
+     * Specifically, this handles:
+     * * Opal days starting at 4am
+     * * Dynamic day of weeks being the weekend for Opal purposes (Friday included from 16th Oct 2023)
+     * * Public holidays are considered weekends for Opal purposes
+     *
+     * @param network - the currently applicable OpalNetwork object
+     * @param date - Javascript date to determine the Opal date for
+     * @returns object with date in YYYYMMDD format, day of week as an integer value (1-7) and whether it is an Opal weekend
+     *
+     */
     static getOpalDate(network: OpalNetwork, date: Date) {
         const zonedTime = DateTime.fromJSDate(date, { zone: network.CONFIG.TZ });
         const opalTime = zonedTime.minus(Duration.fromObject({hours: 4})); // opal day starts at 4am
 
-        return {date: opalTime.toFormat('yyyyMMdd'), dow: opalTime.weekday}
-    }
+        const ymd = opalTime.toFormat('yyyyMMdd');
+        const dow = opalTime.weekday;
 
-    static getDailyCap(network: OpalNetwork, type: string, tapOn: OpalFareTap) {
-        const params = this.getFareParameters(network, type);
-        const opalFareDate = OpalFareCalculator.getOpalDate(network, tapOn.time);
+        const isOffPeakDayOfWeek = network.CONFIG.WEEKEND_FARE_DOW.includes(dow);
+        const isPublicHoliday = network.TOU.PUBLIC_HOLIDAYS.includes(ymd);
 
-        if(network.CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow)){
-            return {amount: params.CAPS.WEEKEND_DAILY_CAP, ymd: opalFareDate.date}
-        }
+        const isWeekendPH = (isOffPeakDayOfWeek || isPublicHoliday);
 
-        return {amount: params.CAPS.DAILY_CAP, ymd: opalFareDate.date}
+        return {date: ymd, dow, isWeekendPH}
     }
 
     /**
-     * Returns whether two consecutive legs are likely to involve a tap off / tap on event
+     * For a given nework, fare type and tap on time, determine the daily fare cap to be applied
      *
-     * @remarks
-     * For rail, this checks whether the station requires tapping off
-     *
-     * @param prevLeg - The previous leg
-     * @param currLeg - The current leg
-     * @returns true if a tap off / tap on event is likely to occur, false if not
+     * @param network - the currently applicable OpalNetwork object
+     * @param type - fare type (e.g. ADULT)
+     * @param date - Javascript date to determine the daily cap for
+     * @returns the daily cap amount in cents as an integer
      *
      */
-    static isLikelyOutOfStationInterchange(prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
-        // TODO: 
-        return false;
+    static getDailyCap(network: OpalNetwork, type: string, time: Date) {
+        const params = this.getFareParameters(network, type);
+        const opalFareDate = OpalFareCalculator.getOpalDate(network, time);
+
+        if(opalFareDate.isWeekendPH){
+            return params.CAPS.WEEKEND_DAILY_CAP
+        }
+
+        return params.CAPS.DAILY_CAP
     }
 
     /**
@@ -205,6 +276,10 @@ export class OpalFareCalculator {
      *
      * @remarks
      * Assumes arrival time is tap off time and departure time is tap on time
+     * 
+     * @remarks
+     * FIXME: this strongly couples the fare calculations with an EFA leg, we should
+     * refactor this to use taps instead
      *
      * @param network - The Opal Network config to use
      * @param prevLeg - The previous leg
@@ -229,6 +304,18 @@ export class OpalFareCalculator {
         );
     }
 
+    /**
+     * Returns the TSN (Transit Stop Number) for a EFA stop object
+     *
+     * @remarks
+     * Note that this assumes Global ID is being returned by EFA, else it
+     * won't be possible to determine the TSN as we do not have a mapping
+     * table in this middleware.
+     *
+     * @param stop - an EFA stop object representing the origin location
+     * @returns a string for the TSN if available, otherwise "-1"
+     *
+     */
     static getTsnForStop(stop: EfaRapidJsonStopPartial) {
         if(stop.type === 'stop' && stop.isGlobalId) return stop.id;
         if(stop.parent?.type === 'stop' && stop.parent?.isGlobalId) return stop.parent.id;
@@ -237,6 +324,16 @@ export class OpalFareCalculator {
         return "-1"
     }
 
+    /**
+     * Returns the approximate location of the stop for a EFA stop object
+     *
+     * @remarks
+     * Assumes coordinates are WGS84 in [lat, lon] format
+     *
+     * @param stop - an EFA stop object representing the origin location
+     * @returns coordinates in array format in [lat, lon] order
+     *
+     */
     static getCoordForStop(stop: EfaRapidJsonStopPartial) {
         if(stop.type === 'platform' && stop.isGlobalId) return stop.coord;
         if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord;
@@ -245,14 +342,21 @@ export class OpalFareCalculator {
         return stop.coord
     }
 
+    /**
+     * Returns whether a tap on is to be charged a peak fare
+     *
+     * @param network - an OpalNetwork object
+     * @param tapOnTime - a Javascript Date object representing the tap on time
+     * @param tsn - a string repreesenting the Transit Stop Number of the tap on
+     * @param mode - identifier for the mode used for Opal fare calculations (e.g. RAIL)
+     * @returns true if a tap on should be charged, otherwise false
+     *
+     */
     static getIsTapOnPeak(network: OpalNetwork, tapOnTime: Date, tsn: string, mode: string) {
         const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: network.CONFIG.TZ });
         const opalFareDate = OpalFareCalculator.getOpalDate(network, tapOnTime);
 
-        const isOffPeakDayOfWeek = network.CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow);
-        const isPublicHoliday = network.TOU.PUBLIC_HOLIDAYS.includes(opalFareDate.date);
-
-        if(isOffPeakDayOfWeek || isPublicHoliday) return false;
+        if(opalFareDate.isWeekendPH) return false;
 
         let periods;
         if(mode === 'RAIL'){
@@ -276,6 +380,19 @@ export class OpalFareCalculator {
         return (isWithinRange(timeOffset, periods.AM_PEAK) || isWithinRange(timeOffset, periods.PM_PEAK));
     }
 
+    /**
+     * Returns a tap on and tap off pair for an EFA leg
+     * 
+     * @remarks
+     * FIXME: we should accept an array of taps to detect previous tap information
+     * instead of using prevLeg. We can refactor this later
+     *
+     * @param network - an OpalNetwork object
+     * @param prevLeg - The previous leg
+     * @param currLeg - The current leg
+     * @returns an object with tap on and tap off
+     *
+     */
     static getTapsForLeg(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial|null|undefined, currLeg: EfaRapidJsonLegPartial) {
         const prevLegKey = !prevLeg ? null : OpalFareCalculator.getOpalModeOfTransportForLeg(prevLeg);
         const currLegKey = OpalFareCalculator.getOpalModeOfTransportForLeg(currLeg);
@@ -323,6 +440,21 @@ export class OpalFareCalculator {
         } as {on: OpalFareTap, off: OpalFareTap}
     }
 
+    /**
+     * To add a new leg to calculate fares
+     * 
+     * @remarks
+     * New leg must have a departure time equal to or after the last arrival time
+     * 
+     * @remarks
+     * FIXME: current implementation strongly couples calculation with EFA legs.
+     * To refactor some of the logic to decouple calculation of fares from the
+     * addition of a EFA leg and use taps instead
+     *
+     * @param leg - the new leg to add
+     * @returns void, leg is accepted
+     *
+     */
     addLeg(leg: EfaRapidJsonLegPartial){
         const network = OpalFareCalculator.getNetworkForTime(new Date(leg.origin.departureTimeEstimated ?? leg.origin.departureTimePlanned));
 
@@ -509,13 +641,13 @@ export class OpalFareCalculator {
             }
 
             // apply daily fare cap
-            const dailyCap = OpalFareCalculator.getDailyCap(network, fareType, taps.on);
+            const dailyCap = OpalFareCalculator.getDailyCap(network, fareType, taps.on.time);
             const totalFareTodayPriorToCurrentLeg = this.intramodalJourneySegmentGroups.filter(group => {
                 return group.date === currentIntramodalJourneySegmentGroup.date
             }).reduce((prevValue, group) => prevValue + group.fares[fareType].reduce((prevValue, fare) => prevValue + fare.totalAdditionalFareCents, 0), 0);
             const totalFareToday = totalFareTodayPriorToCurrentLeg + fare.totalAdditionalFareCents;
-            if(totalFareToday > dailyCap.amount){
-                const correction = -(totalFareToday-dailyCap.amount);
+            if(totalFareToday > dailyCap){
+                const correction = -(totalFareToday-dailyCap);
                 fare.components.dailyCapDiscountCents += correction;
                 fare.totalAdditionalFareCents += correction;
             }
@@ -529,6 +661,12 @@ export class OpalFareCalculator {
         }
     }
 
+    /**
+     * Exports fare calculation data to an object
+     *
+     * @returns object of leg fares
+     *
+     */
     toObject(){
         return {
             fares: this.legFares,
@@ -536,6 +674,12 @@ export class OpalFareCalculator {
         }
     }
 
+    /**
+     * Exports an array of EFA-compatable ticket objects
+     *
+     * @returns array of EFA ticket objects
+     *
+     */
     toEfaFareObject(){
         const createFareObject = (fare: OpalFareComponent, jsGroup: OpalIntramodalJourneySegmentGroup) => {
             const dollarString = ((fare.totalAdditionalFareCents/100) + fare.totalAdditionalSafCents/100).toFixed(2);
