@@ -1,8 +1,8 @@
 # Opal Fare Calculator
 
-Transport for NSW indicated that fare calculations will not be provided through the existing API from 19th October 2023 onwards.  This is a middleware application which can be deployed to Cloudflare Workers which will re-inject fare calculations into TfNSW Trip Planner API responses.
+Transport for NSW indicated that fare calculations will [not be provided](https://opendataforum.transport.nsw.gov.au/t/opal-fares-on-trip-planner-api-to-be-removed-16-october-2023/3534) through the existing API from 19th October 2023 onwards.  This is a middleware application which can be deployed to Cloudflare Workers which will re-inject fare calculations back into TfNSW Trip Planner API responses.
 
-It is intended to be a drop-in replacement to ensure existing applications continue to work.
+It is intended to be a drop-in replacement to ensure existing applications continue to work and is to be used in conjunction with the TfNSW [Trip Planner API](https://opendata.transport.nsw.gov.au/dataset/trip-planner-apis).
 
 # Usage
 
