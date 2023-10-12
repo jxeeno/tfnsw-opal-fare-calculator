@@ -1,0 +1,32 @@
+{
+    "METRO_PEAK": {
+        "AM_PEAK": [
+            390,
+            600
+        ],
+        "PM_PEAK": [
+            900,
+            1140
+        ]
+    },
+    "OUTER_METRO_PEAK": {
+        "AM_PEAK": [
+            360,
+            600
+        ],
+        "PM_PEAK": [
+            900,
+            1140
+        ]
+    },
+    "FERRY_PEAK": {
+        "AM_PEAK": [
+            0,
+            720
+        ],
+        "PM_PEAK": [
+            720,
+            1440
+        ]
+    }
+}

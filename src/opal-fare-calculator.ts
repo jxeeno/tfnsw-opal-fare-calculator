@@ -1,15 +1,16 @@
-import REF_RAIL_DISTANCE from "./ref/rail_distance.json";
-import REF_FERRY_DISTANCE from "./ref/ferry_distance.json";
-import REF_PEAK_HOURS from "./ref/peak_hours.json";
-import REF_PUBLIC_HOLIDAYS from "./ref/public_holidays.json";
-import REF_OUTER_METRO_STATIONS from "./ref/outer_metro_stations.json";
-import REF_SAF_TSN from "./ref/saf_tsn.json";
-import REF_FARE_TABLE from "./ref/fare_table.json";
-import REF_CONFIG from "./ref/config.json";
-
+// import REF_RAIL_DISTANCE from "./ref/rail_distance.json";
+// import REF_FERRY_DISTANCE from "./ref/ferry_distance.json";
+// import REF_PEAK_HOURS from "./ref/peak_hours.json";
+// import REF_PUBLIC_HOLIDAYS from "./ref/public_holidays.json";
+// import REF_OUTER_METRO_STATIONS from "./ref/outer_metro_stations.json";
+// import REF_SAF_TSN from "./ref/saf_tsn.json";
+// import REF_FARE_TABLE from "./ref/fare_table.json";
+// import REF_CONFIG from "./ref/config.json";
+import REF_NETWORKS from "./ref/networks.json";
+import { OpalNetwork, OpalFareComponent, OpalFareTap, OpalFareTransactionType, OpalIntramodalJourneySegmentGroup } from './opal.types';
+import { EfaRapidJsonLegPartial, EfaRapidJsonStopPartial } from "./efa.types";
 import { DateTime, Duration } from 'luxon';
 import distance from "@turf/distance";
-import { EfaRapidJsonLegPartial, EfaRapidJsonStopPartial, OpalFareComponent, OpalFareTap, OpalFareTransactionType, OpalIntramodalJourneySegmentGroup } from "./efa.types";
 
 export class OpalFareCalculator {
     constructor(){}
@@ -20,6 +21,18 @@ export class OpalFareCalculator {
     allLegs: EfaRapidJsonLegPartial[] = [];
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
 
+    static getNetworkForTime(time?: Date){
+        const networks = REF_NETWORKS as OpalNetwork[];
+        for(const network of networks){
+            const {date} = this.getOpalDate(network, time ?? new Date());
+            if(date >= network.CONFIG.VALID_FROM && date <= network.CONFIG.VALID_TO){
+                return network;
+            }
+        }
+        
+        // otherwise, return the last network
+        return networks[networks.length-1]
+    }
 
     static isLegStocktonFerry(leg: EfaRapidJsonLegPartial){
         return (leg.transportation.product.class === 9 && ['3000'].includes(leg.transportation.operator.id))
@@ -84,43 +97,48 @@ export class OpalFareCalculator {
         return 'NON_OPAL'
     }
 
-    static getFareDistance(mode: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial){
+    static getFareDistance(network: OpalNetwork, mode: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial){
         const originTsn = OpalFareCalculator.getTsnForStop(origin);
         const destinationTsn = OpalFareCalculator.getTsnForStop(destination);
         const odKey = `${originTsn}:${destinationTsn}`;
         if(mode === "RAIL"){
-            return (REF_RAIL_DISTANCE as {[k: string]: number})[odKey] ?? null;
+            return (network.DISTANCE_MATRIX.RAIL)[odKey] ?? null;
         }else if(mode === "FERRY"){
-            return (REF_FERRY_DISTANCE as {[k: string]: number})[odKey] ?? null;
+            return (network.DISTANCE_MATRIX.FERRY)[odKey] ?? null;
         }
     }
 
-    static getBaseFare(type: string, mode: string, distance: number|undefined, isPeak: boolean, isFou: boolean) {
-        if(distance == null) return;
-
-        const fareTable = (REF_FARE_TABLE as any);
+    static getBaseFare(network: OpalNetwork, type: string, mode: string, distance: number, isPeak: boolean, isFou: boolean) {
+        const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
         
         const modeFares = fareTable[type].MODES[mode];
-        if(!modeFares) return;
+        if(!modeFares) throw new Error(`Mode ${mode} and fare type ${type} could not be found`);
 
-        const fareKey = (isFou ? 'FOU_' : '') + (isPeak ? 'PEAK' : 'OFFPEAK');
+        const fareKey = (isFou ? 'FOU_' : '') + (isPeak ? 'PEAK' : 'OFFPEAK') as "PEAK"|"OFFPEAK"|"FOU_PEAK"|"FOU_OFFPEAK";
 
+        // use the max band as fallback
+        let lastBand;
         for(const band in modeFares){
             if(distance >= modeFares[band].FROM_KM && distance < modeFares[band].TO_KM){
                 return modeFares[band][fareKey]
             }
+            lastBand = modeFares[band][fareKey];
         }
+
+        if(!lastBand) throw new Error(`No fare found for ${fareKey} with mode ${mode} and fare type ${type}`);
+
+        return lastBand;
     }
 
-    static getStationAccessFee(type: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial) {
-        const fareTable = (REF_FARE_TABLE as any);
+    static getStationAccessFee(network: OpalNetwork, type: string, origin: EfaRapidJsonStopPartial, destination: EfaRapidJsonStopPartial) {
+        const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
 
         const originTsn = OpalFareCalculator.getTsnForStop(origin);
         const destinationTsn = OpalFareCalculator.getTsnForStop(destination);
 
-        if(REF_SAF_TSN.includes(originTsn) || REF_SAF_TSN.includes(destinationTsn)){
+        if(network.SAF_TSN.includes(originTsn) || network.SAF_TSN.includes(destinationTsn)){
             // SAF is applicable
             if(!fareTable[type].SAF) return 0; // TODO: throw error
 
@@ -135,13 +153,13 @@ export class OpalFareCalculator {
         return 0;
     }
 
-    static getFareTypes(){
-        const fareTable = (REF_FARE_TABLE as any);
+    static getFareTypes(network: OpalNetwork){
+        const fareTable = network.FARE_TABLE;
         return Object.keys(fareTable);
     }
 
-    static getFareParameters(type: string) {
-        const fareTable = (REF_FARE_TABLE as any);
+    static getFareParameters(network: OpalNetwork, type: string) {
+        const fareTable = network.FARE_TABLE;
         if(!fareTable[type]) throw new Error(`Fare type ${type} could not be found`);
         
         return fareTable[type] as {
@@ -155,18 +173,18 @@ export class OpalFareCalculator {
         };
     }
 
-    static getOpalDate(date: Date) {
-        const zonedTime = DateTime.fromJSDate(date, { zone: REF_CONFIG.TZ });
+    static getOpalDate(network: OpalNetwork, date: Date) {
+        const zonedTime = DateTime.fromJSDate(date, { zone: network.CONFIG.TZ });
         const opalTime = zonedTime.minus(Duration.fromObject({hours: 4})); // opal day starts at 4am
 
         return {date: opalTime.toFormat('yyyyMMdd'), dow: opalTime.weekday}
     }
 
-    static getDailyCap(type: string, tapOn: OpalFareTap) {
-        const params = this.getFareParameters(type);
-        const opalFareDate = OpalFareCalculator.getOpalDate(tapOn.time);
+    static getDailyCap(network: OpalNetwork, type: string, tapOn: OpalFareTap) {
+        const params = this.getFareParameters(network, type);
+        const opalFareDate = OpalFareCalculator.getOpalDate(network, tapOn.time);
 
-        if(REF_CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow)){
+        if(network.CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow)){
             return {amount: params.CAPS.WEEKEND_DAILY_CAP, ymd: opalFareDate.date}
         }
 
@@ -196,17 +214,18 @@ export class OpalFareCalculator {
      * @remarks
      * Assumes arrival time is tap off time and departure time is tap on time
      *
+     * @param network - The Opal Network config to use
      * @param prevLeg - The previous leg
      * @param currLeg - The current leg
      * @returns true if eligible for discount
      *
      */
-    static isEligibleForTransferDiscount(prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
+    static isEligibleForTransferDiscount(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial, currLeg: EfaRapidJsonLegPartial){
         const prevArrivalTime = new Date(prevLeg.destination.arrivalTimeEstimated ?? prevLeg.destination.arrivalTimePlanned).valueOf();
         const currDepartureTime = new Date(currLeg.origin.departureTimeEstimated ?? currLeg.origin.departureTimePlanned).valueOf();
 
-        const prevArrivalOpalYmd = OpalFareCalculator.getOpalDate(new Date(prevArrivalTime)).date; // opal day starts at 4am
-        const currArrivalOpalYmd = OpalFareCalculator.getOpalDate(new Date(currDepartureTime)).date; // opal day starts at 4am
+        const prevArrivalOpalYmd = OpalFareCalculator.getOpalDate(network, new Date(prevArrivalTime)).date; // opal day starts at 4am
+        const currArrivalOpalYmd = OpalFareCalculator.getOpalDate(network, new Date(currDepartureTime)).date; // opal day starts at 4am
 
         return (
             // transfer period is max 1 hour
@@ -234,27 +253,27 @@ export class OpalFareCalculator {
         return stop.coord
     }
 
-    static getIsTapOnPeak(tapOnTime: Date, tsn: string, mode: string) {
-        const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: REF_CONFIG.TZ });
-        const opalFareDate = OpalFareCalculator.getOpalDate(tapOnTime);
+    static getIsTapOnPeak(network: OpalNetwork, tapOnTime: Date, tsn: string, mode: string) {
+        const zonedTime = DateTime.fromJSDate(tapOnTime, { zone: network.CONFIG.TZ });
+        const opalFareDate = OpalFareCalculator.getOpalDate(network, tapOnTime);
 
-        const isOffPeakDayOfWeek = REF_CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow);
-        const isPublicHoliday = REF_PUBLIC_HOLIDAYS.includes(opalFareDate.date);
+        const isOffPeakDayOfWeek = network.CONFIG.WEEKEND_FARE_DOW.includes(opalFareDate.dow);
+        const isPublicHoliday = network.TOU.PUBLIC_HOLIDAYS.includes(opalFareDate.date);
 
         if(isOffPeakDayOfWeek || isPublicHoliday) return false;
 
         let periods;
         if(mode === 'RAIL'){
-            if(REF_OUTER_METRO_STATIONS.includes(tsn)){
+            if(network.TOU.OUTER_METRO_STATIONS.includes(tsn)){
                 // outer metro
-                periods = REF_PEAK_HOURS.OUTER_METRO_PEAK
+                periods = network.TOU.PEAK_HOURS.OUTER_METRO_PEAK
             }else{
                 // metro
-                periods = REF_PEAK_HOURS.METRO_PEAK
+                periods = network.TOU.PEAK_HOURS.METRO_PEAK
             }
         }else{
             // non rail and non ferry
-            periods = REF_PEAK_HOURS.METRO_PEAK
+            periods = network.TOU.PEAK_HOURS.METRO_PEAK
         }
 
         const timeOffset = zonedTime.hour * 60 + zonedTime.minute;
@@ -265,11 +284,11 @@ export class OpalFareCalculator {
         return (isWithinRange(timeOffset, periods.AM_PEAK) || isWithinRange(timeOffset, periods.PM_PEAK));
     }
 
-    static getTapsForLeg(prevLeg: EfaRapidJsonLegPartial|null|undefined, currLeg: EfaRapidJsonLegPartial) {
+    static getTapsForLeg(network: OpalNetwork, prevLeg: EfaRapidJsonLegPartial|null|undefined, currLeg: EfaRapidJsonLegPartial) {
         const prevLegKey = !prevLeg ? null : OpalFareCalculator.getOpalModeOfTransportForLeg(prevLeg);
         const currLegKey = OpalFareCalculator.getOpalModeOfTransportForLeg(currLeg);
 
-        const isTransfer = (prevLeg && prevLegKey !== 'NON_OPAL' && OpalFareCalculator.isEligibleForTransferDiscount(prevLeg, currLeg));
+        const isTransfer = (prevLeg && prevLegKey !== 'NON_OPAL' && OpalFareCalculator.isEligibleForTransferDiscount(network, prevLeg, currLeg));
         const isIntermodalTransfer = isTransfer && prevLegKey !== currLegKey;
         const isIntramodalTransfer = isTransfer && prevLegKey === currLegKey;
 
@@ -287,7 +306,10 @@ export class OpalFareCalculator {
         const tapOffTime = new Date(currLeg.destination.arrivalTimeEstimated ?? currLeg.destination.arrivalTimePlanned);
 
         const isPeakTapOn = OpalFareCalculator.isLegStocktonFerry(currLeg) || OpalFareCalculator.getIsTapOnPeak(
-            tapOnTime, originTsn, currLegKey
+            network,
+            tapOnTime,
+            originTsn,
+            currLegKey
         );
 
         return {
@@ -310,10 +332,12 @@ export class OpalFareCalculator {
     }
 
     addLeg(leg: EfaRapidJsonLegPartial){
+        const network = OpalFareCalculator.getNetworkForTime(new Date(leg.origin.departureTimeEstimated ?? leg.origin.departureTimePlanned));
+
         this.allLegs.push(leg);
 
         const prevLeg = this.legs[this.legs.length-1];
-        const taps = OpalFareCalculator.getTapsForLeg(prevLeg, leg);
+        const taps = OpalFareCalculator.getTapsForLeg(network, prevLeg, leg);
 
         if(taps.on.mode === 'NON_OPAL') return;
 
@@ -336,7 +360,8 @@ export class OpalFareCalculator {
                 taps: [],
                 fares: {},
                 mode: taps.on.mode,
-                ...OpalFareCalculator.getOpalDate(taps.on.time)
+                ...OpalFareCalculator.getOpalDate(network, taps.on.time),
+                network
             };
             this.intramodalJourneySegmentGroups.push(currentIntramodalJourneySegmentGroup);
         }
@@ -345,7 +370,7 @@ export class OpalFareCalculator {
         currentIntramodalJourneySegmentGroup.taps.push(taps.on, taps.off);
 
         // now calculate fares for current intramodal journey segments
-        const fareTypes = OpalFareCalculator.getFareTypes();
+        const fareTypes = OpalFareCalculator.getFareTypes(network);
         for(const fareType of fareTypes){
             if(!this.legFares[fareType]) this.legFares[fareType] = []
             if(!currentIntramodalJourneySegmentGroup.fares[fareType]) currentIntramodalJourneySegmentGroup.fares[fareType] = []
@@ -353,10 +378,14 @@ export class OpalFareCalculator {
             const totalFareForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares[fareType].reduce((pv, fare) => pv + fare.totalAdditionalFareCents, 0);
             const totalSafForIntermodalJourneySegmentGroup = currentIntramodalJourneySegmentGroup.fares[fareType].reduce((pv, fare) => pv + fare.totalAdditionalSafCents, 0);
             
-            const intermodalDiscountCents = [
-                OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
-                OpalFareTransactionType.TAP_ON_F1_INTERMODAL_TRANSFER
-            ].includes(currentIntramodalJourneySegmentGroup.taps[0].transactionType) ? -OpalFareCalculator.getFareParameters(fareType).INTERMODAL_DISCOUNT : 0;
+            const intermodalDiscountCents = (
+                [
+                    OpalFareTransactionType.TAP_ON_INTERMODAL_TRANSFER,
+                    OpalFareTransactionType.TAP_ON_F1_INTERMODAL_TRANSFER
+                ].includes(currentIntramodalJourneySegmentGroup.taps[0].transactionType) ?
+                -OpalFareCalculator.getFareParameters(network, fareType).INTERMODAL_DISCOUNT :
+                0
+            );
 
             let shouldLegUsePeakFare = taps.on.isPeakTapOn;
             let permitNegativeAdditionalFare = false;
@@ -375,11 +404,13 @@ export class OpalFareCalculator {
                 ].destination;
 
                 fareDistance = OpalFareCalculator.getFareDistance(
+                    network,
                     currentIntramodalJourneySegmentGroup.mode,
                     origin, destination
                 );
 
                 stationAccessFeeCents = OpalFareCalculator.getStationAccessFee(
+                    network,
                     fareType,
                     origin,
                     destination
@@ -410,7 +441,11 @@ export class OpalFareCalculator {
                 }
             }
 
+            // TODO: throw an error
+            if(fareDistance == null) throw new Error(`Could not calculate fare distance`);
+
             const baseFareCents = OpalFareCalculator.getBaseFare(
+                network,
                 fareType,
                 currentIntramodalJourneySegmentGroup.mode,
                 fareDistance,
@@ -419,6 +454,7 @@ export class OpalFareCalculator {
             );
 
             const baseFareCentsCurrentContext = OpalFareCalculator.getBaseFare(
+                network,
                 fareType,
                 currentIntramodalJourneySegmentGroup.mode,
                 fareDistance,
@@ -481,7 +517,7 @@ export class OpalFareCalculator {
             }
 
             // apply daily fare cap
-            const dailyCap = OpalFareCalculator.getDailyCap(fareType, taps.on);
+            const dailyCap = OpalFareCalculator.getDailyCap(network, fareType, taps.on);
             const totalFareTodayPriorToCurrentLeg = this.intramodalJourneySegmentGroups.filter(group => {
                 return group.date === currentIntramodalJourneySegmentGroup.date
             }).reduce((prevValue, group) => prevValue + group.fares[fareType].reduce((prevValue, fare) => prevValue + fare.totalAdditionalFareCents, 0), 0);
@@ -513,7 +549,7 @@ export class OpalFareCalculator {
             const dollarString = ((fare.totalAdditionalFareCents/100) + fare.totalAdditionalSafCents/100).toFixed(2);
             const safDollarString = (fare.totalAdditionalSafCents/100).toFixed(2);
             const noSafDollarString = (fare.totalAdditionalFareCents/100).toFixed(2);
-            const fareName = OpalFareCalculator.getFareParameters(fare.type).NAME;
+            const fareName = OpalFareCalculator.getFareParameters(jsGroup.network, fare.type).NAME;
             const legIdx = this.allLegs.indexOf(fare.leg);
             return {
                 "id": `ANYTRIP-EST-${fare.type}-${fare.mode}`, // "REG-BUSES-PEAK",
@@ -538,6 +574,8 @@ export class OpalFareCalculator {
                 "validForOneOperatorOnly": "UNKNOWN",
                 "numberOfChanges": jsGroup.legs.length,
                 "nameValidityArea": "",
+                "validFrom": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_FROM, 'yyyyMMdd').plus(Duration.fromObject({hours: 4})).toISO(),
+                "validTo": DateTime.fromFormat(jsGroup.network.CONFIG.VALID_TO, 'yyyyMMdd').endOf('day').plus(Duration.fromObject({hours: 4})).toISO(),
                 "properties": {
                     "riderCategoryName": fareName,
                     "priceStationAccessFee": safDollarString,
