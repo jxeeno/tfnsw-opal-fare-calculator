@@ -15,7 +15,7 @@ Fares calculated by this implementation is a best estimate based on available in
 - [ ] Opal-enabled temporary bus services which replace rail or ferry services are returning bus fares
 - [ ] Light rail is not currently using distance matrix
 - [x] Station Access Fees are not available yet
-- [ ] Daily and weekly caps are not available yet
+- [x] Daily caps are not available yet
 - [x] Implement other fares types (other than Adult and Child)
 
 ## Outstanding tasks
@@ -35,6 +35,7 @@ Fares calculated by this implementation is a best estimate based on available in
 * FOU is not implemented - not relevant in journey plan fare estimate and not available after 19th October
 * Fare calculations assume all trips of the journeys occur within the same Opal day. Fare rules specific to services spanning across multiple Opal days or weeks are not applied.
 * Distance-based fares without a distance mapping table (i.e. bus services) use approximate distances which may not be the same as the distances used for calculating actual Opal fares. This can be due to variations in coordinates between systems and map projection. This may impact a small number of bus stop combinations where the distance is close to the edge of the bands.
+
 ## Implemented rules
 
 * Rail and ferry distances from mapping table
@@ -47,3 +48,4 @@ Fares calculated by this implementation is a best estimate based on available in
 * Highest fare band rule for intra-modal transfers
 * Inter-modal transfer discount
 * Station access fee
+* Daily caps
