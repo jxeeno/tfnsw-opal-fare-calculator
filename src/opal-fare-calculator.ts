@@ -390,9 +390,9 @@ export class OpalFareCalculator {
             periods = network.TOU.PEAK_HOURS.METRO_PEAK
         }
 
-        const timeOffset = zonedTime.hour * 60 + zonedTime.minute;
+        const timeOffset = zonedTime.hour * 60 * 60 + zonedTime.minute * 60 + zonedTime.second;
         const isWithinRange = (timeOffset: number, range: number[]) => {
-            return timeOffset >= range[0] && timeOffset < range[1]
+            return timeOffset > (range[0] * 60) && timeOffset <= (range[1] * 60)
         }
 
         return (isWithinRange(timeOffset, periods.AM_PEAK) || isWithinRange(timeOffset, periods.PM_PEAK));
