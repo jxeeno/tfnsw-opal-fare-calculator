@@ -733,6 +733,8 @@ export class OpalFareCalculator {
         const evaluationTicketByTicket = fareTypes.map(fareType => {
             const fares = faresByLeg.filter(fare => fare.person === fareType);
             const cloned = structuredClone(fares[0]);
+            cloned.fromLeg = Math.min(...fares.map(fare => fare.fromLeg));
+            cloned.toLeg = Math.max(...fares.map(fare => fare.toLeg));
             (cloned.properties as any).evaluationTicket = "nswFareEnabled";
             cloned.priceBrutto = Number(fares.reduce((pv, fare) => pv + Number(fare.priceBrutto), 0).toFixed(2));
             cloned.properties.priceTotalFare = fares.reduce((pv, fare) => pv + Number(fare.properties.priceTotalFare), 0).toFixed(2);
