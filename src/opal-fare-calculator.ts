@@ -408,7 +408,11 @@ export class OpalFareCalculator {
                     destination
                 );
 
-                shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps.some(tap => tap.isPeakTapOn);
+                shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn;
+
+                // virtual tap on will inherit peak status in the first tap of the journey segment group
+                taps.on.isPeakTapOn = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn;
+                
                 permitNegativeAdditionalFare = true;
                 retainHighestFareBand = false;
             }else{
@@ -544,7 +548,7 @@ export class OpalFareCalculator {
             const fareName = OpalFareCalculator.getFareParameters(jsGroup.network, fare.type).NAME;
             const legIdx = this.allLegs.indexOf(fare.leg);
             return {
-                "id": `ANYTRIP-EST-${fare.type}-${fare.mode}`, // "REG-BUSES-PEAK",
+                "id": `ANYTRIP-EST-${fare.type}-${fare.mode}-${fare.taps.on.isPeakTapOn ? 'PEAK' : 'OFFPEAK'}`, // "REG-BUSES-PEAK",
                 "name": "Opal tariff",
                 "comment": "",
                 "URL": "",
