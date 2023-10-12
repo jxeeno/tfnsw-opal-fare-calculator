@@ -1,11 +1,3 @@
-// import REF_RAIL_DISTANCE from "./ref/rail_distance.json";
-// import REF_FERRY_DISTANCE from "./ref/ferry_distance.json";
-// import REF_PEAK_HOURS from "./ref/peak_hours.json";
-// import REF_PUBLIC_HOLIDAYS from "./ref/public_holidays.json";
-// import REF_OUTER_METRO_STATIONS from "./ref/outer_metro_stations.json";
-// import REF_SAF_TSN from "./ref/saf_tsn.json";
-// import REF_FARE_TABLE from "./ref/fare_table.json";
-// import REF_CONFIG from "./ref/config.json";
 import REF_NETWORKS from "./ref/networks.json";
 import { OpalNetwork, OpalFareComponent, OpalFareTap, OpalFareTransactionType, OpalIntramodalJourneySegmentGroup } from './opal.types';
 import { EfaRapidJsonLegPartial, EfaRapidJsonStopPartial } from "./efa.types";
