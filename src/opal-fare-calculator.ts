@@ -14,6 +14,7 @@ export class OpalFareCalculator {
     intramodalJourneySegmentGroups: OpalIntramodalJourneySegmentGroup[] = [];
 
     /**
+     * 
      * Returns the valid Opal Network configuration object for a given tap on time
      *
      * @param time - a Javascript Date object representing the tap on time
@@ -34,6 +35,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns whether a leg from the EFA trip planner response is the Stockton ferry
      *
      * @param leg - an EFA trip planner leg
@@ -45,6 +47,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the mode of transport used for Opal calculations from an EFA leg
      *
      * @param leg - The leg from Trip Planner API
@@ -104,6 +107,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the estimated fare distance from a distance matrix
      *
      * @param network - the currently applicable OpalNetwork object
@@ -125,6 +129,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the base fare to be charged, usually without discounts
      * However, peak and FOU discount can be specified.
      *
@@ -161,6 +166,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the station access fee to be charged if applicable
      * `0` is returned if no station access fee is charged
      *
@@ -194,6 +200,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns an array of fare types in the current OpalNetwork config
      * e.g. `["ADULT", "CHILD", ...]`
      *
@@ -207,6 +214,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the applicable fare parameters for a given fare type
      *
      * @param network - the currently applicable OpalNetwork object
@@ -222,6 +230,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the date, day of week and if it is a weekend for Opal purposes
      * as used by Opal for fare calculation
      * 
@@ -251,6 +260,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * For a given nework, fare type and tap on time, determine the daily fare cap to be applied
      *
      * @param network - the currently applicable OpalNetwork object
@@ -271,6 +281,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns whether two consecutive legs is eligible for the inter-modal transfer discounts
      * or if the Opal Trip Advantage (intra-modal transfer discount) applies
      *
@@ -305,6 +316,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the TSN (Transit Stop Number) for a EFA stop object
      *
      * @remarks
@@ -325,6 +337,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns the approximate location of the stop for a EFA stop object
      *
      * @remarks
@@ -343,6 +356,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns whether a tap on is to be charged a peak fare
      *
      * @param network - an OpalNetwork object
@@ -381,6 +395,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Returns a tap on and tap off pair for an EFA leg
      * 
      * @remarks
@@ -441,6 +456,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * To add a new leg to calculate fares
      * 
      * @remarks
@@ -662,6 +678,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Exports fare calculation data to an object
      *
      * @returns object of leg fares
@@ -675,6 +692,7 @@ export class OpalFareCalculator {
     }
 
     /**
+     * 
      * Exports an array of EFA-compatible ticket objects
      *
      * @returns array of EFA ticket objects
