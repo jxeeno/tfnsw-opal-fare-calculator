@@ -82,3 +82,12 @@ node index.js
 * Highest fare band rule for intra-modal transfers
 * Station access fee
 * Daily caps
+
+# Validation
+
+We are continuing to test the results of this calculator against the existing Trip Planner API.  Approximately 1.2k journeys have gone through this test and are matching.
+
+Note, we have also identified defects in the existing fare calculation logic for the Trip Planner API - namely:
+
+* In a journey consisting of Opal-enabled Train -> NSW TrainLink Regional Train -> Bus, the existing Trip Planner API will (for the purposes of determining inter-modal transfers) combine the two train legs and use the arrival time of the regional train service to determine if the train to bus transfer is eligible for a discount.  This logic is incorrect and has not been replicated in this calculator.
+* Stockton Ferry charges peak bus fares in the Trip Planner API.  We have followed this implementation.  However, the new fare calculation engine used on transportnsw.info allows for off-peak fares.  We have sought clarification on this.
