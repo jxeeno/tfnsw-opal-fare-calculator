@@ -56,7 +56,7 @@ const TIMES = {
 async function main() {
     const queryAndSave = async (origin, destination, timeKey, timeParams) => {
         const combinationKey = `${origin}_${destination}_${timeKey}`;
-        const pathName = `../src/tests/snapshots/${combinationKey}.json`;
+        const pathName = `../snapshots/${combinationKey}.json`;
         if(!fs.existsSync(pathName)){
             const {data} = await axios.get('https://api.transport.nsw.gov.au/v1/tp/trip', {
                 params: {

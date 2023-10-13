@@ -1,7 +1,4 @@
-import { unstable_dev } from 'wrangler';
-import type { UnstableDevWorker } from 'wrangler';
-import { vi, describe, expect, it, beforeAll, afterAll } from 'vitest';
-import createFetchMock from 'vitest-fetch-mock';
+import { describe, expect, it } from 'vitest';
 import { OpalFareCalculator } from './opal-fare-calculator';
 
 
@@ -14,7 +11,7 @@ const excluded = [
 const testSnapshot = (fname: string) => {
 
 	it(`should calculate correct fares for ${fname}`, async () => {
-		const mockedResponse = (await import(`./tests/snapshots/${fname}.json`)) as any;
+		const mockedResponse = (await import(`../snapshots/${fname}.json`)) as any;
 		for(let i = 0; i < mockedResponse.journeys.length-1; i++){
 			const journey = mockedResponse.journeys[i];
 			const journeyId = `${fname}::${i}`;
