@@ -355,11 +355,11 @@ export class OpalFareCalculator {
      *
      */
     static getCoordForStop(stop: EfaRapidJsonStopPartial) {
-        if(stop.type === 'platform' && stop.isGlobalId) return stop.coord.concat().reverse();
-        if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord.concat().reverse();
-        if(stop.parent?.parent?.type === 'platform' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.coord.concat().reverse();
+        if(stop.type === 'platform' && stop.isGlobalId) return stop.coord.concat().reverse() as [number, number];
+        if(stop.parent?.type === 'platform' && stop.parent?.isGlobalId) return stop.parent.coord.concat().reverse() as [number, number];
+        if(stop.parent?.parent?.type === 'platform' && stop.parent?.parent?.isGlobalId) return stop.parent.parent.coord.concat().reverse() as [number, number];
 
-        return stop.coord.concat().reverse();
+        return stop.coord.concat().reverse() as [number, number];
     }
 
     /**
@@ -412,8 +412,8 @@ export class OpalFareCalculator {
      *
      */
     static getTapsForLeg(network: OpalNetwork, priorTaps: OpalFareTap[], currLeg: EfaRapidJsonLegPartial, transferWalkTime: number|null) {
-        const prevTap = priorTaps[priorTaps.length-1];
-        const prevLegKey = priorTaps[priorTaps.length-1]?.mode;
+        const prevTapOn = priorTaps[priorTaps.findLastIndex((tap: OpalFareTap) => tap.isTapOn)];
+        const prevLegKey = prevTapOn?.mode;
         const currLegKey = OpalFareCalculator.getOpalModeOfTransportForLeg(currLeg);
 
         const originTsn = OpalFareCalculator.getTsnForStop(currLeg.origin);
@@ -427,10 +427,10 @@ export class OpalFareCalculator {
         const canUseTransferWalkTime = (['RAIL', 'FERRY'].includes(prevLegKey ?? '') || ['RAIL', 'FERRY'].includes(currLegKey));
 
         const isTransfer = (
-            prevTap &&
+            prevTapOn &&
             OpalFareCalculator.isEligibleForTransferDiscount(
                 network,
-                prevTap.time,
+                prevTapOn.time,
                 tapOnTime,
                 canUseTransferWalkTime ? transferWalkTime : null
             )
@@ -460,6 +460,7 @@ export class OpalFareCalculator {
                 time: tapOnTime,
                 isTapOn: true,
                 coords: OpalFareCalculator.getCoordForStop(currLeg.origin),
+                date: 1,
                 isPeakTapOn
             },
             off: {

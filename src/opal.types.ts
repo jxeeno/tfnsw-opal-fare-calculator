@@ -93,7 +93,7 @@ export type OpalFareTap = {
 
     mode: string;
     isTapOn: boolean;
-    isPeakTapOn: boolean;
+    isPeakTapOn?: boolean;
 }
 
 export type OpalFareComponent = {
