@@ -48,7 +48,9 @@ export default {
                         efaTotalFare: efaFares?.reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
                         anytripTotalFare: anytripFares.reduce((pv: number, ticket: any) => pv + Number(ticket.properties.priceTotalFare), 0).toFixed(2),
                         efaByLeg: efaFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare})),
-                        anytripByLeg: anytripFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare}))
+                        anytripByLeg: anytripFares?.map((f: any) => ({id: f.id, fromLeg: f.fromLeg, toLeg: f.toLeg, fare: f.properties.priceTotalFare})),
+                        taps: calculator.taps,
+                        legSummary: journey.legs.map(leg => leg.transportation.product.name)
                     }
 
                     if(result.efaTotalFare !== result.anytripTotalFare){
