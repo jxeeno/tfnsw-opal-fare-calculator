@@ -92,10 +92,20 @@ export class OpalFareCalculator {
         }
 
         // Bus
-        // TODO: handle school buses and replacement buses
+        // TODO: handle replacement buses
+        // TODO: automate agency_id list
         if (
-            // Regular Opal bus
-            (leg.transportation.product.class === 5 && ["Sydney Buses Network", "Hunter Buses Network", "Illawarra Buses Network", "Central Coast Buses Network"].includes(leg.transportation.product.name)) ||
+            // Regular Opal bus or school bus
+            (
+                [5, 11].includes(leg.transportation.product.class) &&
+                [
+                    "2433","2436","2447","2448","2449","2450","2452","2453","2454","2455","2456","2457","2458","2459","2502","2503","2507","2508","2509","2510","2514","3000"
+                ].includes(
+                    leg.transportation.operator.id
+                )
+            )
+            
+            ||
 
             // Stockton Ferry charged as bus fare
             OpalFareCalculator.isLegStocktonFerry(leg)
