@@ -545,7 +545,7 @@ export class OpalFareCalculator {
                 0
             );
 
-            let shouldLegUsePeakFare = taps.on.isPeakTapOn;
+            let shouldLegUsePeakFare = taps.on.isPeakTapOn ?? false;
             let permitNegativeAdditionalFare = false;
             let retainHighestFareBand = true;
 
@@ -574,10 +574,10 @@ export class OpalFareCalculator {
                     destination
                 );
 
-                shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn;
+                shouldLegUsePeakFare = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn ?? false;
 
                 // virtual tap on will inherit peak status in the first tap of the journey segment group
-                taps.on.isPeakTapOn = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn;
+                taps.on.isPeakTapOn = currentIntramodalJourneySegmentGroup.taps[0].isPeakTapOn ?? false;
                 
                 permitNegativeAdditionalFare = true;
                 retainHighestFareBand = false;
@@ -597,7 +597,7 @@ export class OpalFareCalculator {
                         const pairDistance = distance(origin, destination, {units: 'kilometers'});
                         if(fareDistance == null || pairDistance > fareDistance){
                             fareDistance = pairDistance;
-                            shouldLegUsePeakFare = tapOn.isPeakTapOn;
+                            shouldLegUsePeakFare = tapOn.isPeakTapOn ?? false;
                         }
                     }    
                 }
